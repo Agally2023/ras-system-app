@@ -1,0 +1,26 @@
+:root{--bg:#f1f6f5;--ink:#10302f;--mute:#4f6b69;--line:#c5d8d5;--panel:#e4efed;--card:#fafdfc;--ok:#1d7a52;--warn:#a8650a;--bad:#a8321f;--acc:#0f5c5a;--accink:#fff;color-scheme:light dark}
+@media(prefers-color-scheme:dark){:root{--bg:#0b1819;--ink:#e3f1ef;--mute:#9db8b5;--line:#2c4645;--panel:#12282a;--card:#0f2021;--ok:#5fcf9b;--warn:#f0b04a;--bad:#ff8b78;--acc:#5fc4bf;--accink:#082322}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.5 system-ui,sans-serif}
+.wrap{max-width:1120px;margin:0 auto;padding:22px 16px 44px}.narrow{max-width:420px}
+h1{font-size:28px;margin:0}h2{font-size:16px;margin:0 0 10px}
+.top{display:flex;align-items:center;gap:12px;margin-bottom:12px}.top h1{flex:1}
+.muted,.note{color:var(--mute);font-size:13px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:14px}
+.tabs a{padding:10px 16px;color:var(--mute);text-decoration:none;border-bottom:3px solid transparent}
+.tabs a.active{color:var(--ink);border-bottom-color:var(--acc)}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px;display:grid;gap:10px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+@media(max-width:760px){.kpis{grid-template-columns:repeat(2,1fr)}}
+.k{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px}
+.k span{display:block;color:var(--mute);font-size:12px}.k b{font-size:28px}.k small{color:var(--mute)}
+button{font:600 14px system-ui;padding:8px 14px;border-radius:6px;border:1px solid var(--acc);background:var(--acc);color:var(--accink);cursor:pointer}
+button.ghost{background:transparent;color:var(--acc)}button:disabled{opacity:.5;cursor:not-allowed}
+input,select{width:100%;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)}
+label{display:grid;gap:3px;font-size:13px;color:var(--mute)}
+.set{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px 16px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.sc{overflow-x:auto}.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th,.tbl td{padding:5px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+.tbl th{color:var(--mute)}.slider{display:flex;gap:8px;align-items:center;min-width:170px}.slider input{padding:0}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}.off{color:var(--mute)}
