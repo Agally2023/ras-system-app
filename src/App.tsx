@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard'
 import DataEntry from './pages/DataEntry'
 import Plc from './pages/Plc'
 import Admin from './pages/Admin'
+import Simulator from './pages/Simulator'
 
 export default function App() {
   const { session, role, loading } = useAuth()
@@ -20,12 +21,14 @@ export default function App() {
       </header>
       <nav className="tabs">
         <NavLink to="/">Dashboard</NavLink>
+        <NavLink to="/simulator">Jar simulator</NavLink>
         <NavLink to="/data">Data entry</NavLink>
         <NavLink to="/plc">PLC I/O</NavLink>
         <NavLink to="/admin">Admin</NavLink>
       </nav>
       <Routes>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/simulator" element={<Simulator />} />
         <Route path="/data" element={<DataEntry />} />
         <Route path="/plc" element={<Plc />} />
         <Route path="/admin" element={<Admin />} />

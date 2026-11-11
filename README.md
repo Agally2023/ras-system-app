@@ -11,6 +11,7 @@ Stack: Vite, React, TypeScript, Supabase (Postgres, Auth, Row Level Security).
 | Tab | What it does |
 | --- | --- |
 | Dashboard | Per-line jar table. Valve sliders save to the database, and Auto-set valves finds the openings that give each jar its target flow. Flow, expansion and status come from the model in `src/lib/model.ts` |
+| Jar simulator | Animated plumbing schematic of 4 jars on one pump and header. Drag a valve slider or type a flow in L/min per jar and watch the egg bed lift, wash out or splash. Live 10 L buckets, auto-tune, surge test. What-if only, nothing is saved |
 | Data entry | Bucket tests (flow = 60 x volume / time) and the jar measurement sheet |
 | PLC I/O | I/O list and active alarms with acknowledge |
 | Admin | All pump, valve, oxygen, layout and egg settings. Creates the system on first use |
@@ -61,5 +62,5 @@ key. Never put the service-role key in this front-end.
 
 ## Not yet ported from the dashboard
 
-Animated plumbing schematic, RAS control simulation and the manual with all symbols.
+RAS control simulation (pumps, pipes and PID control) and the manual with all symbols.
 Auto-set valves (per line, on the Dashboard) is included.
