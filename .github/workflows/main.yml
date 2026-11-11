@@ -24,8 +24,8 @@ jobs:
       - run: npm install
       - run: npm run build
         env:
-          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://isfqytwwdncagbofuqxg.supabase.co' }}
-          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY || 'sb_publishable_7PhvQEb05J8yILSikFe8_w_VD4N9iE-' }}
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://rciyzoosuncncecqmqaq.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY || 'sb_publishable_xPtL1fliQk2k28dWVl4sMQ_GW5poZ-t' }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

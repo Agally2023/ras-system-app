@@ -19,7 +19,7 @@ Roles: `viewer` (read), `operator` (data entry, valves, alarm acks), `admin` (ev
 
 ## 1. Supabase
 
-1. Supabase project "RAS System" (ref isfqytwwdncagbofuqxg, eu-central-1) already exists with the schema applied. For a fresh project, create one first.
+1. Supabase project (ref rciyzoosuncncecqmqaq, eu-north-1) already exists with the schema applied. For a fresh project, create one first.
 2. For a fresh project, apply the two files in `supabase/migrations/` in order (SQL editor, or `supabase db push`).
 3. Authentication > Providers: keep Email enabled.
 4. Sign up in the app once, then promote yourself in the SQL editor:
