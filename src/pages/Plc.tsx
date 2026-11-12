@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { canEdit, useAuth } from '../lib/auth'
 import { useSystem } from '../lib/useSystem'
+import PlcHmi from './PlcHmi'
 
 export default function Plc() {
   const { system } = useSystem()
   const { session, role } = useAuth()
   const [tags, setTags] = useState<any[]>([])
   const [alarms, setAlarms] = useState<any[]>([])
+  const [tab, setTab] = useState<'hmi' | 'io'>('hmi')
 
   const load = () => {
     if (!system) return
@@ -26,6 +28,11 @@ export default function Plc() {
 
   return (
     <>
+      <div className="seg" style={{ width: 'fit-content', marginBottom: 10 }}>
+        <button className={tab === 'hmi' ? 'on' : ''} onClick={() => setTab('hmi')}>PLC + HMI connection</button>
+        <button className={tab === 'io' ? 'on' : ''} onClick={() => setTab('io')}>I/O list and alarms</button>
+      </div>
+      {tab === 'hmi' ? <PlcHmi /> : <>
       <div className="panel">
         <h2>Active alarms</h2>
         {alarms.length === 0 ? <p className="note">No active alarms</p> : (
@@ -48,6 +55,7 @@ export default function Plc() {
         </table></div>
         <p className="note">A browser cannot read a PLC directly. Live values need a gateway that writes to ras_tag_readings with the service-role key (see README).</p>
       </div>
+      </>}
     </>
   )
 }
