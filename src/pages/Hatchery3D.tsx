@@ -104,7 +104,7 @@ export default function Hatchery3D({ lines, selKey, selPos, spacing, onSelect }:
       const c = Math.cos(g.yaw), s = Math.sin(g.yaw), se = Math.sin(g.elev), ce = Math.cos(g.elev)
       const cx0 = (x0 + x1) / 2, cz0 = (zmin + zmax) / 2, cy0 = 0.95
       let umin = Infinity, umax = -Infinity, vmin = Infinity, vmax = -Infinity
-      for (const x of [x0, x1]) for (const z of [zmin - 0.7, zmax + 0.5]) for (const y of [0, 2.1]) {
+      for (const x of [x0, x1]) for (const z of [zmin - 2.4, zmax + 0.5]) for (const y of [0, 2.1]) {
         const dx = x - cx0, dz = z - cz0, u = dx * c + dz * s, v = (-dx * s + dz * c) * se - (y - cy0) * ce
         umin = Math.min(umin, u); umax = Math.max(umax, u); vmin = Math.min(vmin, v); vmax = Math.max(vmax, v)
       }
@@ -126,18 +126,56 @@ export default function Hatchery3D({ lines, selKey, selPos, spacing, onSelect }:
       ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap = cap; ctx.setLineDash(dash ?? []); ctx.lineDashOffset = off
       ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(PX, PY); ctx.stroke(); ctx.setLineDash([])
     }
-    // shaded pipe between two world points
-    function pipe(a: number[], b: number[], r: number, flowQ = 0, time = 0, flowW = 0.55) {
+    // Round pipe between two world points: shaded across its width like a cylinder, with a visible end
+    // cap where the pipe is open, and water flowing inside. Flow runs from a to b.
+    type PC = { b: string; h: string; e: string }
+    function pipe(a: number[], b: number[], r: number, flowQ = 0, time = 0, flowW = 0.55, o: { ca?: boolean; cb?: boolean; col?: PC } = {}) {
+      const col = o.col ?? { b: pal.pipe, h: pal.pipeHi, e: pal.pipeEdge }
       const w = r * 2 * S
-      seg(a, b, w + 2, pal.pipeEdge); seg(a, b, w, pal.pipe)
-      P(a[0], a[1], a[2]); const x1 = PX, y1 = PY; P(b[0], b[1], b[2])
-      ctx.strokeStyle = pal.pipeHi; ctx.globalAlpha = 0.8; ctx.lineWidth = Math.max(1, w * 0.22); ctx.lineCap = 'butt'
-      const o = w * 0.22
-      ctx.beginPath(); ctx.moveTo(x1 - o, y1 - o); ctx.lineTo(PX - o, PY - o); ctx.stroke(); ctx.globalAlpha = 1
+      P(a[0], a[1], a[2]); const x1 = PX, y1 = PY; P(b[0], b[1], b[2]); const x2 = PX, y2 = PY
+      const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy)
+      if (len > 0.5) {
+        const nx = -dy / len, ny = dx / len, mx = (x1 + x2) / 2, my = (y1 + y2) / 2
+        const g = ctx.createLinearGradient(mx - nx * w / 2, my - ny * w / 2, mx + nx * w / 2, my + ny * w / 2)
+        g.addColorStop(0, col.e); g.addColorStop(0.2, col.b); g.addColorStop(0.4, col.h); g.addColorStop(0.65, col.b); g.addColorStop(1, col.e)
+        ctx.lineCap = 'butt'; ctx.strokeStyle = col.e; ctx.lineWidth = w + 2
+        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke()
+        ctx.strokeStyle = g; ctx.lineWidth = w
+        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke()
+      }
       if (flowQ > 0.02) {
         const L = Math.max(3, 0.05 * S)
         seg(a, b, Math.max(1.5, w * flowW), pal.flow, 'round', [L, L * 1.4], -time * (0.5 + flowQ * 0.06) * S * 0.5)
       }
+      // open end caps, drawn only on the end that faces the viewer
+      let ax = b[0] - a[0], ay = b[1] - a[1], az = b[2] - a[2]; const al = Math.hypot(ax, ay, az) || 1; ax /= al; ay /= al; az /= al
+      const dot = ax * -sp * cE + ay * sE + az * cp * cE
+      const hx = Math.abs(ay) > 0.9 ? [1, 0, 0] : [0, 1, 0]
+      let ux = ay * hx[2] - az * hx[1], uy = az * hx[0] - ax * hx[2], uz = ax * hx[1] - ay * hx[0]; const ul = Math.hypot(ux, uy, uz) || 1; ux /= ul; uy /= ul; uz /= ul
+      const vx = ay * uz - az * uy, vy2 = az * ux - ax * uz, vz = ax * uy - ay * ux
+      const cap = (c: number[]) => {
+        for (const k of [1, 0.7]) {
+          ctx.beginPath()
+          for (let i = 0; i < 18; i++) { const th = (i / 18) * 6.2832, cs = Math.cos(th) * r * k, sn = Math.sin(th) * r * k; P(c[0] + cs * ux + sn * vx, c[1] + cs * uy + sn * vy2, c[2] + cs * uz + sn * vz); i ? ctx.lineTo(PX, PY) : ctx.moveTo(PX, PY) }
+          ctx.closePath(); ctx.fillStyle = k === 1 ? col.e : 'rgba(10,30,40,0.55)'; ctx.fill()
+          if (k === 1) { ctx.strokeStyle = col.e; ctx.lineWidth = 1; ctx.stroke() }
+        }
+      }
+      if (o.cb && dot > 0.05) cap(b)
+      if (o.ca && -dot > 0.05) cap(a)
+    }
+    // elbow / tee joint: a shaded sphere that hides the pipe ends meeting inside it
+    function joint(x: number, y: number, z: number, r: number, col?: PC) {
+      const c = col ?? { b: pal.pipe, h: pal.pipeHi, e: pal.pipeEdge }
+      P(x, y, z); const R = r * S * 1.14
+      const g = ctx.createRadialGradient(PX - R * 0.35, PY - R * 0.35, R * 0.1, PX, PY, R)
+      g.addColorStop(0, c.h); g.addColorStop(0.55, c.b); g.addColorStop(1, c.e)
+      ctx.beginPath(); ctx.arc(PX, PY, R, 0, 6.2832); ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = c.e; ctx.lineWidth = 1; ctx.stroke()
+    }
+    // coupling band around a pipe
+    function band(a: number[], t0: number, r: number) {
+      void t0; const d = 0.028
+      pipe([a[0], a[1], a[2]], [a[0] + d * (a[3] ?? 0), a[1] + d * (a[4] ?? 0), a[2] + d * (a[5] ?? 0)], r * 1.2, 0, 0, 0, { ca: true, cb: true, col: { b: pal.pipeEdge, h: pal.pipe, e: pal.ink } })
     }
     function box(x: number, z: number, y0: number, y1: number, hxb: number, hzb: number, hxt: number, hzt: number, fill: string, stroke: string, top?: string) {
       const bot = [[-hxb, -hzb], [hxb, -hzb], [hxb, hzb], [-hxb, hzb]], tp = [[-hxt, -hzt], [hxt, -hzt], [hxt, hzt], [-hxt, hzt]]
@@ -289,7 +327,7 @@ export default function Hatchery3D({ lines, selKey, selPos, spacing, onSelect }:
       // spout lip
       seg([x, ySp, z + d * RJ], [x, ySp, z + d * (RJ + 0.04)], Math.max(2, 0.025 * S), pal.ink)
       // valve: white body with the red lever (open = along the pipe, closed = across it)
-      pipe([x, vy - 0.045, z], [x, vy + 0.045, z], 0.03)
+      pipe([x, vy - 0.045, z], [x, vy + 0.045, z], 0.03, 0, 0, 0, { ca: true, cb: true })
       const open = j.valve / 100, ang = (1 - open) * Math.PI / 2
       seg([x, vy, z], [x, vy + Math.cos(ang) * 0.17, z + Math.sin(ang) * 0.17 * d], Math.max(2.4, 0.024 * S), on ? pal.handle : pal.off, 'round')
       // status lamp
@@ -321,8 +359,8 @@ export default function Hatchery3D({ lines, selKey, selPos, spacing, onSelect }:
       // header pipe along the row with water flowing
       ctx.globalAlpha = dim ? 0.22 : 1
       const tot = l.jars.reduce((a, q) => a + (q.on ? q.Q : 0), 0)
-      pipe([-h - 0.45, YH, z], [h - 0.05, YH, z], 0.05, tot / Math.max(1, n) * 3, time, 0.5)
-      P(h - 0.05, YH, z); ctx.fillStyle = pal.pipeEdge; ctx.beginPath(); ctx.arc(PX, PY, 0.05 * S, 0, 6.283); ctx.fill()
+      pipe([-h - 0.45, YH, z], [h - 0.05, YH, z], 0.05, tot / Math.max(1, n) * 3, time, 0.5, { cb: true })
+      joint(-h - 0.45, YH, z, 0.05)
       // label is drawn in a final pass so nearer rows never paint over it
       labels.push(() => {
         P(-h - 0.28, 0.04, z); ctx.globalAlpha = dim ? 0.35 : 1
@@ -369,14 +407,35 @@ export default function Hatchery3D({ lines, selKey, selPos, spacing, onSelect }:
       // manifold on the supply end (left) with the pump
       const manifold = () => {
         const xm = -hx - 0.55 - 0.45
-        const zs = L.map(rowZ), zmin = Math.min(...zs), zmax = Math.max(...zs)
+        const zs = L.map(rowZ), zmin = Math.min(...zs), zmax = Math.max(...zs), zp = zmin - 1.0
         const tot = L.reduce((a, l) => a + l.jars.reduce((b, jj) => b + (jj.on ? jj.Q : 0), 0), 0)
-        for (const l of L) pipe([xm, YH, rowZ(l)], [-(l.jars.length * sp0) / 2 - 0.55, YH, rowZ(l)], 0.045, tot / 40, time)
-        pipe([xm, YH, zmin - 0.9], [xm, YH, zmax], 0.075, tot / 40, time, 0.5)
-        pipe([xm, 0.2, zmin - 0.9], [xm, YH, zmin - 0.9], 0.075, tot / 40, time, 0.5)
-        box(xm, zmin - 0.9, 0, 0.25, 0.2, 0.2, 0.2, 0.2, '#3a6aa0', pal.ink, '#5a8ac0')
-        labels.push(() => { P(xm, 0, zmin - 0.9 + 0.22); ctx.fillStyle = pal.text; ctx.font = '700 12px system-ui,sans-serif'; ctx.textAlign = 'center'
-          ctx.fillText('RAS pump', PX, PY + 14); ctx.font = '12px system-ui,sans-serif'; ctx.fillStyle = pal.flow; ctx.fillText(`${tot.toFixed(0)} L/min`, PX, PY + 28); ctx.textAlign = 'start' })
+        const fq = tot / 40, steel = { b: '#4a78b0', h: '#8fb6e0', e: '#1d3f68' }, fin = { b: '#2f5a8e', h: '#6b95c6', e: '#14304f' }
+        // floor posts carrying the manifold
+        for (let z = zp; z <= zmax + 0.01; z += 1.6) { box(xm, z, 0, YH - 0.09, 0.025, 0.025, 0.025, 0.025, pal.stand, pal.ink); box(xm, z, YH - 0.11, YH - 0.07, 0.07, 0.04, 0.07, 0.04, pal.stand, pal.ink) }
+        // pump set: base plate, motor with cooling fins, volute casing
+        box(xm - 0.22, zp, 0, 0.05, 0.45, 0.24, 0.45, 0.24, pal.stand, pal.ink, '#7d8f90')
+        pipe([xm - 0.55, 0.28, zp], [xm - 0.12, 0.28, zp], 0.15, 0, 0, 0, { ca: true, col: steel })
+        for (let k = 0; k < 5; k++) pipe([xm - 0.5 + k * 0.085, 0.28, zp], [xm - 0.46 + k * 0.085, 0.28, zp], 0.168, 0, 0, 0, { ca: true, cb: true, col: fin })
+        pipe([xm, 0.1, zp], [xm, 0.42, zp], 0.19, 0, 0, 0, { cb: true, col: steel })
+        // suction line from the sump and the discharge riser
+        pipe([xm, 0.27, zp - 1.1], [xm, 0.27, zp - 0.1], 0.085, fq, time, 0.5, { ca: true })
+        band([xm, 0.27, zp - 0.45, 0, 0, 1], 0, 0.085)
+        joint(xm, 0.27, zp - 0.1, 0.085)
+        pipe([xm, 0.42, zp], [xm, YH, zp], 0.075, fq, time, 0.5)
+        for (const yb of [0.7, 1.15]) band([xm, yb, zp, 0, 1, 0], 0, 0.075)
+        // manifold along the rows, tee-ing off into every header
+        pipe([xm, YH, zp], [xm, YH, zmax], 0.075, fq, time, 0.5, { cb: true })
+        for (let z = zp + 1.1; z < zmax; z += 1.6) band([xm, YH, z, 0, 0, 1], 0, 0.075)
+        for (const l of L) {
+          const zr = rowZ(l), xe = -(l.jars.length * sp0) / 2 - 0.55
+          pipe([xm, YH, zr], [xe, YH, zr], 0.05, fq, time, 0.5)
+          band([xm + 0.45, YH, zr, 1, 0, 0], 0, 0.05)
+          joint(xm, YH, zr, 0.075)
+        }
+        joint(xm, YH, zp, 0.075)
+        labels.push(() => { P(xm, 0, zp + 0.35); ctx.fillStyle = pal.text; ctx.font = '700 12px system-ui,sans-serif'; ctx.textAlign = 'center'
+          ctx.fillText('RAS pump', PX, PY + 14); ctx.font = '12px system-ui,sans-serif'; ctx.fillStyle = pal.flow; ctx.fillText(`${tot.toFixed(0)} L/min`, PX, PY + 28)
+          P(xm, 0.27, zp - 1.1); ctx.fillStyle = pal.text; ctx.font = '11px system-ui,sans-serif'; ctx.textAlign = 'right'; ctx.fillText('from sump', PX - 14, PY - 6); ctx.textAlign = 'start' })
       }
       if (sp <= 0) manifold()
       for (const it of items) it.run()
