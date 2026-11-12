@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { canEdit, useAuth } from '../lib/auth'
 import { useSystem } from '../lib/useSystem'
 import { autoTune, computeJars, jarModel, Settings, solveLine } from '../lib/model'
+import Hatchery3D, { type Line3 } from './Hatchery3D'
 
 // Hatchery view: every jar drawn as it stands on the floor. One header pipe per line, a ball valve on each
 // drop pipe, a clear McDonald jar with its egg bed, an overflow tray under each jar.
@@ -58,6 +59,7 @@ export default function Simulator() {
   const [head, setHead] = useState<number | null>(null)
   const [msg, setMsg] = useState('')
   const [busy, setBusy] = useState(false)
+  const [view, setView] = useState<'2d' | '3d'>('3d')
 
   const s: Settings = useMemo(() => {
     const base = { ...DEFAULTS, ...(settings ?? {}) } as Settings
@@ -86,13 +88,23 @@ export default function Simulator() {
   const inTarget = all.filter(r => r.st[1] === 'ok').length
 
   // per-jar drawing data for the selected line
-  const draw = useMemo(() => rows.map(r => {
+  const drawAll = useMemo(() => lines.map(l => l.rows.map(r => {
     const M = jarModel(r.jar, s), Hs = r.jar.spout_depth_cm ?? 50, sc = WATER_PX / Hs
     const wash = r.x.r === Infinity
     const T = !r.jar.is_on ? 0 : wash ? 1 : Math.max(0, Math.min(1, (r.u / M.ut - 0.17) / 0.35))
     const bedPx = Math.min((wash ? 9 : r.x.r) * M.H0 * sc, WATER_PX - 4)
     return { M, Hs, sc, T, wash, bedPx, settledPx: M.H0 * sc }
-  }), [rows, s])
+  })), [lines, s])
+  const li = Math.max(0, lines.findIndex(l => l.key === cur?.key))
+  const draw = drawAll[li] ?? []
+  const lines3: Line3[] = useMemo(() => lines.map((l, k) => ({
+    key: l.key, station: +l.key.split('-')[0], idx: l.key.split('-')[1].charCodeAt(0) - 65,
+    jars: l.rows.map((r, i) => {
+      const d = drawAll[k][i]
+      return { Q: r.Q, T: d.T, bed: d.bedPx / d.sc / 100, settled: d.M.H0 / 100, water: d.Hs / 100, valve: +r.jar.valve_open_pct || 0,
+        on: !!r.jar.is_on, tone: r.st[1], stage: r.jar.stage, wash: d.wash, code: r.jar.jar_code, status: r.st[0] }
+    }),
+  })), [lines, drawAll])
 
   // ---------- animation (refs so the loop never re-renders React)
   const wrap = useRef<HTMLDivElement>(null), cv = useRef<HTMLCanvasElement>(null)
@@ -184,7 +196,7 @@ export default function Simulator() {
     }
     raf = requestAnimationFrame(frame)
     return () => cancelAnimationFrame(raf)
-  }, [n, W, lineKey])
+  }, [n, W, lineKey, view])
 
   // ---------- controls
   const setValve = (pos: number, v: number) =>
@@ -258,6 +270,10 @@ export default function Simulator() {
       <div className="panel">
         <div className="row" style={{ alignItems: 'center', gap: 14 }}>
           <h2 style={{ margin: 0, flex: 1 }}>Station {stn}, line {lin}</h2>
+          <div className="seg" role="group" aria-label="View">
+            <button className={view === '3d' ? 'on' : ''} aria-pressed={view === '3d'} onClick={() => setView('3d')}>3D view</button>
+            <button className={view === '2d' ? 'on' : ''} aria-pressed={view === '2d'} onClick={() => setView('2d')}>2D elevation</button>
+          </div>
           <label style={{ minWidth: 220 }}>Line head: {f(s.line_head_m, 1)} m (all jars)
             <input type="range" min={0.3} max={6} step={0.1} value={s.line_head_m} onChange={e => setHead(+e.target.value)} /></label>
           <label style={{ minWidth: 160 }}>All valves on this line
@@ -268,6 +284,10 @@ export default function Simulator() {
         </div>
         {msg && <p className="note" role="status">{msg}</p>}
 
+        {view === '3d' ? (
+          <Hatchery3D lines={lines3} selKey={cur.key} selPos={sel} spacing={Math.max(0.22, +s.jar_spacing_m || 0.25)}
+            onSelect={(k, i) => { setLineKey(k); setSelPos(i + 1) }} />
+        ) : (<>
         <div className="sc">
           <div ref={wrap} style={{ position: 'relative', width: W, height: H }}>
             <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Station ${stn} line ${lin}: ${n} jars on one header`}>
@@ -328,6 +348,7 @@ export default function Simulator() {
           </div>
         </div>
         <p className="note">Numbers under each jar: position on the header, then flow in L/min. Dashed line in a jar is the settled egg height. In target the eggs tumble gently, too strong and they wash into the tray.</p>
+        </>)}
       </div>
 
       {r && d && (
@@ -353,7 +374,7 @@ export default function Simulator() {
             <div><span>Rise speed in jar</span><b>{f(r.u)} cm/s</b></div>
             <div><span>Bed expansion</span><b>{r.x.r === Infinity ? 'washout' : f(r.x.r) + 'x'}</b></div>
             <div><span>Fluidised from / washout at</span><b>{f(d.M.umf * d.M.A * 0.06)} / {f(d.M.ut * d.M.A * 0.06)} L/min</b></div>
-            <div><span>Eggs splashed into tray</span><b>{lostN[sel] ?? 0} of {NE}</b></div>
+            {view === '2d' && <div><span>Eggs splashed into tray</span><b>{lostN[sel] ?? 0} of {NE}</b></div>}
           </div>
         </div>
       )}
