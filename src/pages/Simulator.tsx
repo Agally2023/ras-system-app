@@ -9,7 +9,7 @@ import Hatchery3D, { type Line3 } from './Hatchery3D'
 // drop pipe, a clear McDonald jar with its egg bed, an overflow tray under each jar.
 // Click a jar to adjust its valve or type a flow. The line head slider changes the flow of the whole line.
 
-const DEFAULTS: Settings = {
+export const DEFAULTS: Settings = {
   pump_shutoff_head_m: 3, pump_free_flow_lpm: 60, valve_capacity_lpm_per_rm: 12,
   line_head_m: 2, header_diameter_mm: 50, jar_spacing_m: 0.25,
   egg_diameter_mm: 2, egg_density_kg_m3: 1050, water_temp_c: 29,
@@ -17,7 +17,7 @@ const DEFAULTS: Settings = {
 }
 
 // Same stage mix as the database seed (ras_seed_layout). Used when no system exists yet.
-function demoJars(): any[] {
+export function demoJars(): any[] {
   const out: any[] = [], per = 18, a = Math.round(per * 0.5)
   for (let s = 1; s <= 3; s++) for (let l = 0; l < 2; l++) for (let k = 0; k < per; k++) {
     const stage = k < a / 2 ? 1 : k < a ? 2 : k < a + (per - a) / 2 ? 3 : 4
