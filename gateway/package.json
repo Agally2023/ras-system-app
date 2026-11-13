@@ -1,0 +1,9 @@
+{
+  "name": "ras-plc-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Reads the PLC over Modbus TCP and writes readings and alarms to Supabase for the RAS dashboard",
+  "scripts": { "start": "node gateway.mjs", "simulate": "node gateway.mjs --simulate" },
+  "dependencies": { "@supabase/supabase-js": "^2.45.0", "modbus-serial": "^8.0.17" }
+}

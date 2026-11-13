@@ -58,6 +58,17 @@ export const ATTRS: Attr[] = [
   { id: 'jtmp', label: 'Jar temperature', unit: '°C', dec: 1, scope: 'jar', lim: 'temp', fn: (t, c) => lineTemp(t, c) + 0.04 * Math.sin(c.pos * 1.7) },
 ]
 
+// PLC tag behind each graph (see ras_plc_tags and ras_seed_extra_tags).
+export const LINE_CODES = ['1A', '1B', '2A', '2B', '3A', '3B']
+const T2 = (n: number) => String(n).padStart(2, '0')
+const TAGS: Record<string, (c: Ctx) => string> = {
+  nh3: () => 'AT-NH3', no2: () => 'AT-NO2', no3: () => 'AT-NO3', ph: () => 'AT-PH', alk: () => 'AT-ALK', turb: () => 'AT-TURB', cah: () => 'AT-CAH', hard: () => 'AT-HARD',
+  pdis: () => 'PT-100', ptot: () => 'FT-100', pspd: () => 'VFD_SPD', sdo: () => 'AT-100', stmp: () => 'TT-100',
+  lflow: c => `FT-${LINE_CODES[c.li]}`, ltmp: c => `TT-${LINE_CODES[c.li]}`, lprs: c => `PT-${LINE_CODES[c.li]}`, ldin: c => `AT-${LINE_CODES[c.li]}i`, ldout: c => `AT-${LINE_CODES[c.li]}o`, lvalve: c => `ZT-${LINE_CODES[c.li]}`,
+  jflow: c => `JF-${LINE_CODES[c.li]}-${T2(c.pos)}`, jdo: c => `JO-${LINE_CODES[c.li]}-${T2(c.pos)}`, jprs: c => `JP-${LINE_CODES[c.li]}-${T2(c.pos)}`, jtmp: c => `JT-${LINE_CODES[c.li]}-${T2(c.pos)}`,
+}
+export const tagOf = (a: Attr, c: Ctx) => TAGS[a.id](c)
+
 export const RANGES: { k: Range; label: string; title: string }[] = [
   { k: 'live', label: 'Live', title: 'Last 10 minutes' }, { k: 'hour', label: 'Hourly', title: 'Last 24 hours, one point per hour' },
   { k: 'day', label: 'Daily', title: 'Last 30 days, one point per day' }, { k: 'week', label: 'Weekly', title: 'Last 26 ISO weeks (Monday to Sunday)' },

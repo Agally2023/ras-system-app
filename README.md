@@ -10,7 +10,7 @@ Stack: Vite, React, TypeScript, Supabase (Postgres, Auth, Row Level Security).
 
 | Tab | What it does |
 | --- | --- |
-| Dashboard | Live graphs for every attribute on the HMI (water quality, pump, line and jar KPIs) at live, hourly, daily, weekly (ISO weeks), monthly and yearly resolution, with the farm standards drawn on each graph. Data is simulated (`src/lib/series.ts`) until a PLC gateway writes `ras_tag_readings` |
+| Dashboard | Live graphs for every attribute on the HMI (water quality, pump, line and jar KPIs) at live, hourly, daily, weekly (ISO weeks), monthly and yearly resolution, with the farm standards drawn on each graph. Shows PLC data from `ras_tags_series()` once the gateway has written readings, and a simulation (`src/lib/series.ts`) before that |
 | Jar simulator | Animated plumbing schematic of 4 jars on one pump and header. Drag a valve slider or type a flow in L/min per jar and watch the egg bed lift, wash out or splash. Live 10 L buckets, auto-tune, surge test. What-if only, nothing is saved |
 | Data entry | Bucket tests (flow = 60 x volume / time) and the jar measurement sheet |
 | PLC I/O | I/O list and active alarms with acknowledge |
@@ -54,11 +54,28 @@ git push -u origin main
 The app uses hash routes (`/#/data`), which is what lets it work on GitHub Pages without server rewrites.
 Private repos need a GitHub plan that includes Pages for private repositories.
 
-## PLC gateway (not included)
+## PLC gateway
 
-A browser cannot talk to a PLC. A small gateway (Node-RED, an edge function, or a script on the
-plant network) should insert rows into `ras_tag_readings` and `ras_alarms` using the service-role
-key. Never put the service-role key in this front-end.
+A browser cannot talk to a PLC, so `gateway/` holds a small Node script for the plant computer. It reads the PLC over
+Modbus TCP and writes `ras_tag_readings` and `ras_alarms` with the Supabase service-role key (keep that key on the plant
+computer; never put it in this front-end).
+
+```
+cd gateway && npm install && cp .env.example .env     # fill in SUPABASE_SERVICE_ROLE_KEY and PLC_HOST
+node gateway.mjs --simulate                           # tests the whole path with no PLC
+node gateway.mjs                                      # reads the PLC
+```
+
+- Tags come from `ras_plc_tags`: 486 for the default layout. 40 are the pump, line and valve tags, 8 are the water-quality
+  analysers, and 432 are the jar sensors (flow, oxygen out, pressure, temperature for each of the 108 jars) read from RS-485
+  bus registers `%MW100` onward: 80 registers per line, 4 per jar, each holding value x 100 as a signed 16-bit integer.
+- `%IW` analog inputs are scaled from 4-20 mA with `AI_RAW_4MA` / `AI_RAW_20MA`. Below 3.8 mA or above 20.5 mA is a sensor
+  fault (state `bad`). Check these against your analog card and the Modbus map of your PLC.
+- Plant tags are polled every 10 s and jar tags every 60 s. Once an hour the gateway calls `ras_rollup_readings()`, which
+  summarises completed hours into `ras_tag_hourly` and deletes the raw rows, so history stays small.
+- The Dashboard reads `ras_tags_series()`, which groups readings by hour, day, ISO week (Monday start), month and year in
+  the browser's time zone. It shows live PLC data as soon as any reading exists, and a simulation before that.
+- Migration: `supabase/migrations/20261113000000_ras_readings_series.sql`.
 
 ## Not yet ported from the dashboard
 
