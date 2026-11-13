@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useSystem } from '../lib/useSystem'
 import { computeJars, Settings } from '../lib/model'
 import { DEFAULTS, demoJars } from './Simulator'
+import { LIM0, type Lim } from '../lib/standards'
 
 // PLC and HMI connection view. Field sensors are wired (4-20 mA) to PLC input modules, the jar sensors reach the PLC
 // over an RS-485 bus, and the PLC talks to the operator HMI over Ethernet. The HMI shows jar KPIs (flow, oxygen,
@@ -10,7 +11,6 @@ import { DEFAULTS, demoJars } from './Simulator'
 // when a KPI leaves its limits. Values are simulated from the jar model; failures can be injected to test alarms.
 // Assumed: egg oxygen uptake of 0.12 mg O2 per g eggs per hour at stage 1, rising to 2.2x at stage 4.
 
-type Lim = [number | undefined, number | undefined]
 type Tag = { tag: string; desc: string; io: 'AI' | 'AO' | 'DI' | 'DO' | 'BUS'; unit: string; lo: number; hi: number; alo?: number; ahi?: number; grp: string; addr: string; mod: string; ch: number; dec?: number }
 type Rd = { v: number | null; mA: number | null; st: 'ok' | 'low' | 'high' | 'bad' }
 type St = 'ok' | 'low' | 'high' | 'bad' | 'off'
@@ -30,10 +30,6 @@ const LIMDEF: { k: string; label: string; unit: string; std?: boolean }[] = [
   { k: 'jflow', label: 'Jar flow', unit: '% of target' }, { k: 'jdo', label: 'Jar outlet oxygen', unit: 'mg/L' },
   { k: 'jp', label: 'Jar water pressure', unit: 'bar' }, { k: 'temp', label: 'Water temperature', unit: '°C' },
 ]
-const LIM0: Record<string, Lim> = {
-  nh3: [undefined, 0.25], no2: [undefined, 0], no3: [undefined, 0], alk: [undefined, 100], turb: [undefined, 15], cah: [undefined, 200],
-  hard: [undefined, undefined], ph: [6.8, 8.2], jflow: [80, 120], jdo: [5, undefined], jp: [0.08, 0.6], temp: [26, 31],
-}
 const WQ = [
   { tag: 'AT-NH3', name: 'Ammonia', unit: 'mg/L', dec: 2, lim: 'nh3', rng: [0, 3], base: 0.12, fail: 2.6 },
   { tag: 'AT-NO2', name: 'Nitrite', unit: 'mg/L', dec: 2, lim: 'no2', rng: [0, 1.5], base: 0, fail: 1.3 },
