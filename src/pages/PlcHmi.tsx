@@ -22,25 +22,32 @@ const f = (x: number | null | undefined, d = 1) => (x == null || !Number.isFinit
 const lname = (k: string) => k.replace('-', '')
 const OUR0 = 0.12, STAGE_X = [1, 1.3, 1.7, 2.2]
 
-const LIMDEF: { k: string; label: string; unit: string; dec: number }[] = [
-  { k: 'jflow', label: 'Jar flow', unit: '% of target', dec: 0 }, { k: 'jdo', label: 'Jar outlet oxygen', unit: 'mg/L', dec: 1 },
-  { k: 'jp', label: 'Jar water pressure', unit: 'bar', dec: 2 }, { k: 'temp', label: 'Water temperature', unit: '°C', dec: 1 },
-  { k: 'nh3', label: 'Ammonia (TAN)', unit: 'mg/L', dec: 2 }, { k: 'hard', label: 'Total hardness', unit: 'mg/L CaCO3', dec: 0 },
-  { k: 'ph', label: 'pH', unit: '', dec: 2 }, { k: 'no2', label: 'Nitrite', unit: 'mg/L', dec: 2 }, { k: 'no3', label: 'Nitrate', unit: 'mg/L', dec: 0 },
+const LIMDEF: { k: string; label: string; unit: string; std?: boolean }[] = [
+  { k: 'nh3', label: 'Ammonia', unit: 'mg/L (ppm)', std: true }, { k: 'no2', label: 'Nitrite', unit: 'mg/L (ppm)', std: true },
+  { k: 'no3', label: 'Nitrate', unit: 'mg/L (ppm)', std: true }, { k: 'alk', label: 'Alkalinity', unit: 'mg/L (ppm)', std: true },
+  { k: 'turb', label: 'Turbidity', unit: 'NTU', std: true }, { k: 'cah', label: 'Calcium hardness', unit: 'mg/L (ppm)', std: true },
+  { k: 'hard', label: 'Total hardness', unit: 'mg/L CaCO3' }, { k: 'ph', label: 'pH', unit: '' },
+  { k: 'jflow', label: 'Jar flow', unit: '% of target' }, { k: 'jdo', label: 'Jar outlet oxygen', unit: 'mg/L' },
+  { k: 'jp', label: 'Jar water pressure', unit: 'bar' }, { k: 'temp', label: 'Water temperature', unit: '°C' },
 ]
-const LIM0: Record<string, Lim> = { jflow: [80, 120], jdo: [5, undefined], jp: [0.08, 0.6], temp: [26, 31], nh3: [undefined, 1], hard: [50, 300], ph: [6.8, 8.2], no2: [undefined, 0.5], no3: [undefined, 100] }
+const LIM0: Record<string, Lim> = {
+  nh3: [undefined, 0.25], no2: [undefined, 0], no3: [undefined, 0], alk: [undefined, 100], turb: [undefined, 15], cah: [undefined, 200],
+  hard: [undefined, undefined], ph: [6.8, 8.2], jflow: [80, 120], jdo: [5, undefined], jp: [0.08, 0.6], temp: [26, 31],
+}
 const WQ = [
-  { tag: 'AT-NH3', name: 'Ammonia (TAN)', unit: 'mg/L', dec: 2, lim: 'nh3', rng: [0, 3] },
-  { tag: 'AT-HARD', name: 'Total hardness', unit: 'mg/L CaCO3', dec: 0, lim: 'hard', rng: [0, 400] },
-  { tag: 'AT-PH', name: 'pH', unit: '', dec: 2, lim: 'ph', rng: [5.5, 9] },
-  { tag: 'AT-NO2', name: 'Nitrite', unit: 'mg/L', dec: 2, lim: 'no2', rng: [0, 1.5] },
-  { tag: 'AT-NO3', name: 'Nitrate', unit: 'mg/L', dec: 0, lim: 'no3', rng: [0, 160] },
+  { tag: 'AT-NH3', name: 'Ammonia', unit: 'mg/L', dec: 2, lim: 'nh3', rng: [0, 3], base: 0.12, fail: 2.6 },
+  { tag: 'AT-NO2', name: 'Nitrite', unit: 'mg/L', dec: 2, lim: 'no2', rng: [0, 1.5], base: 0, fail: 1.3 },
+  { tag: 'AT-NO3', name: 'Nitrate', unit: 'mg/L', dec: 1, lim: 'no3', rng: [0, 160], base: 0, fail: 135 },
+  { tag: 'AT-PH', name: 'pH', unit: '', dec: 2, lim: 'ph', rng: [5.5, 9], base: 7.4, fail: 6.3 },
+  { tag: 'AT-ALK', name: 'Alkalinity', unit: 'mg/L', dec: 0, lim: 'alk', rng: [0, 200], base: 80, fail: 160 },
+  { tag: 'AT-TURB', name: 'Turbidity', unit: 'NTU', dec: 1, lim: 'turb', rng: [0, 50], base: 6, fail: 38 },
+  { tag: 'AT-CAH', name: 'Calcium hardness', unit: 'mg/L', dec: 0, lim: 'cah', rng: [0, 300], base: 120, fail: 260 },
+  { tag: 'AT-HARD', name: 'Total hardness', unit: 'mg/L CaCO3', dec: 0, lim: 'hard', rng: [0, 400], base: 150, fail: 150 },
 ]
 const FAILS = [
-  { k: 'nh3', label: 'Ammonia spike', to: 2.6, base: 0.25 }, { k: 'ph', label: 'pH crash', to: 6.3, base: 7.4 },
-  { k: 'no2', label: 'Nitrite spike', to: 1.3, base: 0.08 }, { k: 'no3', label: 'Nitrate build-up', to: 135, base: 40 },
-  { k: 'hard', label: 'Hardness drop', to: 32, base: 125 }, { k: 'heat', label: 'Water too warm', to: 3.8, base: 0 },
-  { k: 'lowdo', label: 'Low oxygen', to: -3.4, base: 0 }, { k: 'block', label: 'Jar S1-A #5 blocked', to: 1, base: 0 },
+  { k: 'nh3', label: 'Ammonia spike', tag: 'AT-NH3' }, { k: 'no2', label: 'Nitrite appears', tag: 'AT-NO2' }, { k: 'no3', label: 'Nitrate appears', tag: 'AT-NO3' },
+  { k: 'ph', label: 'pH crash', tag: 'AT-PH' }, { k: 'alk', label: 'Alkalinity high', tag: 'AT-ALK' }, { k: 'turb', label: 'Turbid water', tag: 'AT-TURB' },
+  { k: 'cah', label: 'Calcium hardness high', tag: 'AT-CAH' }, { k: 'heat', label: 'Water too warm' }, { k: 'lowdo', label: 'Low oxygen' }, { k: 'block', label: 'Jar S1-A #5 blocked' },
 ]
 
 function buildTags(keys: string[], q: number, L: Record<string, Lim>, counts: Record<string, number>): Tag[] {
@@ -65,11 +72,14 @@ function buildTags(keys: string[], q: number, L: Record<string, Lim>, counts: Re
     AI(k, `AT-${n}o`, `Line ${n} overflow dissolved oxygen`, 'mg/L', 0, 20, [L.jdo[0], 12])
   }
   for (const k of keys) AI(k, `ZT-${lname(k)}`, `Line ${lname(k)} mean valve position`, '%', 0, 100, undefined, 0)
-  AI('WQ', 'AT-NH3', 'Total ammonia nitrogen', 'mg/L', 0, 10, L.nh3, 2)
-  AI('WQ', 'AT-HARD', 'Total water hardness', 'mg/L CaCO3', 0, 500, L.hard, 0)
-  AI('WQ', 'AT-PH', 'pH', '', 0, 14, L.ph, 2)
+  AI('WQ', 'AT-NH3', 'Ammonia', 'mg/L', 0, 10, L.nh3, 2)
   AI('WQ', 'AT-NO2', 'Nitrite', 'mg/L', 0, 5, L.no2, 2)
-  AI('WQ', 'AT-NO3', 'Nitrate', 'mg/L', 0, 200, L.no3, 0)
+  AI('WQ', 'AT-NO3', 'Nitrate', 'mg/L', 0, 200, L.no3, 1)
+  AI('WQ', 'AT-PH', 'pH', '', 0, 14, L.ph, 2)
+  AI('WQ', 'AT-ALK', 'Alkalinity', 'mg/L', 0, 300, L.alk, 0)
+  AI('WQ', 'AT-TURB', 'Turbidity', 'NTU', 0, 100, L.turb, 1)
+  AI('WQ', 'AT-CAH', 'Calcium hardness', 'mg/L', 0, 500, L.cah, 0)
+  AI('WQ', 'AT-HARD', 'Total water hardness', 'mg/L CaCO3', 0, 500, L.hard, 0)
   dio('PUMP', 'PUMP_RUN', 'Pump running feedback', 'DI', '%I0.0')
   dio('PUMP', 'PUMP_FAULT', 'Pump fault', 'DI', '%I0.1')
   dio('PUMP', 'SUMP_LOW', 'Sump low level', 'DI', '%I0.2')
@@ -106,8 +116,8 @@ const CSS = `
 .hv{display:grid;grid-template-columns:1fr 1fr;gap:2px 8px;font-size:11px}.hv span{display:flex;justify-content:space-between}
 .jt{width:100%;border-collapse:collapse;font-size:11px}.jt th{color:#7fa3a2;font-weight:400;text-align:right;padding:2px 4px}.jt td{text-align:right;padding:2px 4px;border-top:1px solid #163133}.jt th:first-child,.jt td:first-child{text-align:left}
 .jt .low,.jt .high{color:#f0b04a;font-weight:700}.jt .bad{color:#ff8b78;font-weight:700}.jt .off{color:#5d7776}
-.wq{display:grid;grid-template-columns:1fr auto;gap:2px 8px;background:#102426;border:1px solid #234546;border-radius:6px;padding:6px 8px;margin-bottom:6px}
-.wq.low,.wq.high{border-color:#d19a2e}.wq.bad{border-color:#e0583f}.wq .v{font-size:20px;font-weight:700}
+.wq{display:grid;grid-template-columns:1fr auto;gap:2px 8px;background:#102426;border:1px solid #234546;border-radius:6px;padding:6px 8px}
+.wq.low,.wq.high{border-color:#d19a2e}.wq.bad{border-color:#e0583f}.wq .v{font-size:18px;font-weight:700}
 .wq .rb{grid-column:1/3;position:relative;height:6px;background:#1c3a3c;border-radius:3px}.wq .rb i{position:absolute;top:0;height:6px;background:#1d5a45;border-radius:3px}.wq .rb b{position:absolute;top:-3px;width:3px;height:12px;background:#fff;border-radius:1px}
 .chip{font-weight:700;font-size:10px;padding:1px 6px;border-radius:3px;background:#1d7a52;color:#fff}.chip.low,.chip.high{background:#a8650a}.chip.bad{background:#a8321f}
 .al{background:#102426;border:1px solid #234546;border-radius:6px;padding:4px 8px;font-size:11px}
@@ -170,13 +180,10 @@ export default function PlcHmi() {
       lq[l.key] = { Q, head: l.rows[0]?.head ?? 0, valve: on.length ? on.reduce((a, r) => a + r.jar.valve_open_pct, 0) / on.length : 0 }
     })
     const temp = s.water_temp_c + 3.8 * rp('heat'), doIn = 7.2 + (-3.4) * rp('lowdo')
-    const wq: Record<string, number> = {
-      'AT-NH3': 0.25 + (2.6 - 0.25) * rp('nh3'), 'AT-PH': 7.4 + (6.3 - 7.4) * rp('ph'), 'AT-NO2': 0.08 + (1.3 - 0.08) * rp('no2'),
-      'AT-NO3': 40 + (135 - 40) * rp('no3'), 'AT-HARD': 125 + (32 - 125) * rp('hard'),
-    }
+    const wq: Record<string, number> = Object.fromEntries(WQ.map(w => [w.tag, w.base + (w.fail - w.base) * (FAILS.find(x => x.tag === w.tag) ? rp(FAILS.find(x => x.tag === w.tag)!.k) : 0)]))
     const raw = (tg: Tag, k: number): number => {
       const n = tg.tag, g = lq[tg.grp]
-      if (tg.grp === 'WQ') return wq[n] + nz(k, Math.max(0.002, wq[n] * 0.006))
+      if (tg.grp === 'WQ') return wq[n] === 0 ? 0 : wq[n] + nz(k, Math.max(0.002, wq[n] * 0.006))
       if (tg.grp === 'PUMP') {
         if (n === 'PT-100') return run ? (s.line_head_m + 0.8) * spd * spd / 10.2 + nz(k, 0.004) : 0
         if (n === 'FT-100') return total + nz(k, 0.4)
@@ -312,8 +319,8 @@ export default function PlcHmi() {
   const jc = (st: St, txt: string) => <td className={st === 'ok' ? '' : st}>{st === 'off' ? '-' : st === 'bad' ? '---' : txt}{st === 'low' ? ' ▼' : st === 'high' ? ' ▲' : ''}</td>
   const spark = (a: number[], lo: number, hi: number, col: string) => {
     if (a.length < 2) return null
-    const mn = Math.min(...a, lo), mx = Math.max(...a, hi), pts = a.map((v, i) => `${(i / 39) * 90},${22 - ((v - mn) / (mx - mn || 1)) * 20}`).join(' ')
-    return <svg width="90" height="24"><polyline points={pts} fill="none" stroke={col} strokeWidth="1.5" /></svg>
+    const mn = Math.min(...a, lo), mx = Math.max(...a, hi), pts = a.map((v, i) => `${(i / 39) * 60},${22 - ((v - mn) / (mx - mn || 1)) * 20}`).join(' ')
+    return <svg width="60" height="24"><polyline points={pts} fill="none" stroke={col} strokeWidth="1.5" /></svg>
   }
   const wqTile = (w: typeof WQ[number]) => {
     const r = hv(w.tag), L = lims[w.lim], pos = (v: number) => `${Math.max(0, Math.min(100, ((v - w.rng[0]) / (w.rng[1] - w.rng[0])) * 100))}%`
@@ -324,7 +331,7 @@ export default function PlcHmi() {
         <div><small style={{ color: '#7fa3a2' }}>{w.name}</small><div><span className="v" style={{ color: col }}>{f(r?.v, w.dec)}</span> <small style={{ display: 'inline', color: '#7fa3a2' }}>{w.unit}</small></div></div>
         <div style={{ textAlign: 'right' }}><span className={`chip ${st}`}>{!link ? 'NO LINK' : st === 'ok' ? 'OK' : st === 'bad' ? 'SENSOR FAULT' : st.toUpperCase()}</span><div>{link ? spark(hist.current[w.tag] ?? [], lo, hi, col) : null}</div></div>
         <div className="rb"><i style={{ left: pos(lo), width: `calc(${pos(hi)} - ${pos(lo)})` }} />{r?.v != null && <b style={{ left: pos(r.v) }} />}</div>
-        <small style={{ gridColumn: '1/3', color: '#7fa3a2' }}>limit {L[0] != null ? `min ${L[0]}` : ''}{L[0] != null && L[1] != null ? ' · ' : ''}{L[1] != null ? `max ${L[1]}` : ''}</small>
+        <small style={{ gridColumn: '1/3', color: '#7fa3a2' }}>{L[0] == null && L[1] == null ? 'no limit' : `limit ${L[0] != null ? 'min ' + L[0] : ''}${L[0] != null && L[1] != null ? ' · ' : ''}${L[1] != null ? (L[1] === 0 ? 'none allowed' : 'max ' + L[1]) : ''}`}</small>
       </div>
     )
   }
@@ -452,7 +459,7 @@ export default function PlcHmi() {
                     <small style={{ color: '#7fa3a2', display: 'block', marginTop: 4 }}>Oxygen out = inlet oxygen minus egg uptake ÷ jar flow. ▼ below limit, ▲ above.</small>
                   </div>
                 )}
-                {link && page === 'wq' && <div>{WQ.map(wqTile)}</div>}
+                {link && page === 'wq' && <div className="hg">{WQ.map(wqTile)}</div>}
                 {link && page === 'alm' && (
                   <div className="al" style={{ maxHeight: '100%', overflow: 'auto' }}>
                     {alarms.length === 0 ? <div><span style={{ color: '#5fcf9b' }}>No active alarms</span></div> : alarms.slice(0, 80).map(a => (
@@ -495,16 +502,18 @@ export default function PlcHmi() {
         <p className="note">A signal under 3.8 mA or over 20.5 mA is treated as a broken wire or failed sensor, as in ras_tag_readings. A real PLC reaches this app through a gateway that writes readings to the database.</p>
       </div>
       <div className="panel lim">
-        <h2>HMI alarm limits</h2>
+        <h2>HMI alarm limits and farm standards</h2>
         <div className="sc"><table className="tbl">
-          <thead><tr><th>KPI</th><th>Unit</th><th>Alarm below</th><th>Alarm above</th></tr></thead>
+          <thead><tr><th>KPI</th><th>Unit</th><th>Alarm below</th><th>Alarm above</th><th>Source</th></tr></thead>
           <tbody>{LIMDEF.map(d => (
             <tr key={d.k}><td>{d.label}</td><td>{d.unit}</td>
               {[0, 1].map(i => <td key={i}><input type="number" step="any" value={lims[d.k][i] ?? ''} placeholder="none"
-                onChange={e => setLims(l => { const n: Lim = [...l[d.k]] as Lim; n[i] = e.target.value === '' ? undefined : +e.target.value; return { ...l, [d.k]: n } })} /></td>)}</tr>
+                onChange={e => setLims(l => { const n: Lim = [...l[d.k]] as Lim; n[i] = e.target.value === '' ? undefined : +e.target.value; return { ...l, [d.k]: n } })} /></td>)}
+              <td className={d.std ? 'ok' : 'muted'}>{d.std ? 'Farm standard' : 'Starting guide'}</td></tr>
           ))}</tbody>
         </table></div>
-        <p className="note">Starting values are typical for catfish hatcheries and are only a guide. Set them to your own farm limits. Changes apply to this view only.</p>
+        <button className="ghost" style={{ width: 'fit-content' }} onClick={() => setLims(LIM0)}>Reset to standards</button>
+        <p className="note">Farm standards: ammonia 0.25 or less, nitrite 0, nitrate 0, alkalinity 100 or less, turbidity 15 or less, calcium hardness 200 or less. The other limits are starting guides only. Changes apply to this view only.</p>
       </div>
     </>
   )
