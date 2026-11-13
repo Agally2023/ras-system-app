@@ -41,3 +41,15 @@ export async function fetchSeries(systemId: string, attrs: Attr[], range: Range,
   }
   return out
 }
+
+// Latest value of each tag (last 3 minutes of raw readings), for the SCADA and DCS screens.
+export async function fetchLatest(systemId: string, tags: string[]): Promise<Record<string, number>> {
+  const now = Date.now()
+  const { data, error } = await supabase.rpc('ras_tags_series', {
+    p_system: systemId, p_tags: tags, p_bucket: 'raw', p_since: new Date(now - 3 * 60000).toISOString(), p_until: new Date(now + 1000).toISOString(), p_tz: 'UTC',
+  })
+  if (error) throw new Error(error.message)
+  const out: Record<string, number> = {}, at: Record<string, number> = {}
+  for (const r of (data ?? []) as Row[]) { const t = Date.parse(r.bucket_start); if (!(r.tag in at) || t >= at[r.tag]) { at[r.tag] = t; out[r.tag] = r.avg_v } }
+  return out
+}
