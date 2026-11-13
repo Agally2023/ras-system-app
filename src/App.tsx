@@ -8,6 +8,7 @@ import DataEntry from './pages/DataEntry'
 import Plc from './pages/Plc'
 import Admin from './pages/Admin'
 import Simulator from './pages/Simulator'
+import Scada from './pages/Scada'
 
 export default function App() {
   const { session, role, loading } = useAuth()
@@ -26,6 +27,7 @@ export default function App() {
         <NavLink to="/simulator">Jar simulator</NavLink>
         <NavLink to="/data">Data entry</NavLink>
         <NavLink to="/plc">PLC I/O</NavLink>
+        <NavLink to="/scada">SCADA</NavLink>
         <NavLink to="/admin">Admin</NavLink>
       </nav>
       <Routes>
@@ -33,6 +35,7 @@ export default function App() {
         <Route path="/simulator" element={<Simulator />} />
         <Route path="/data" element={<DataEntry />} />
         <Route path="/plc" element={<Plc />} />
+        <Route path="/scada" element={<Scada />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
