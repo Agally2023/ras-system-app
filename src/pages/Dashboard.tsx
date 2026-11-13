@@ -3,6 +3,8 @@ import { LIM0, type Lim } from '../lib/standards'
 import { ATTRS, RANGES, series, tagOf, type Attr, type Pt, type Range } from '../lib/series'
 import { fetchSeries, hasReadings } from '../lib/readings'
 import { useSystem } from '../lib/useSystem'
+import { SoundToggle, useAlarmSound } from '../lib/alarmSound'
+import { GatewayBadge } from '../lib/gateway'
 
 // Live dashboard: one graph for every attribute on the HMI (whole-RAS water quality, pump and supply, the selected
 // line, the selected jar), at live, hourly, daily, weekly (ISO weeks), monthly and yearly resolution.
@@ -134,7 +136,11 @@ export default function Dashboard() {
   const simData = useMemo(() => (plc ? null : Object.fromEntries(ATTRS.map(a => [a.id, series(a, range, now, ctx)]))), [plc, range, ctx, key])
   const data: Record<string, Pt[]> = plc ? real ?? {} : simData!
   const lastV = (id: string) => { const s = data[id] ?? []; for (let i = s.length - 1; i >= 0; i--) if (Number.isFinite(s[i].v)) return s[i].v; return NaN }
-  const outNow = ATTRS.filter(a => a.lim && Number.isFinite(lastV(a.id)) && outside(lastV(a.id), limOf(a), a.dec)).length
+  const outList = ATTRS.filter(a => a.lim && Number.isFinite(lastV(a.id)) && outside(lastV(a.id), limOf(a), a.dec))
+  const outNow = outList.length, outKey = outList.map(a => a.id).join(',')
+  const [silenced, setSilenced] = useState('')
+  useEffect(() => { if (!outKey) setSilenced('') }, [outKey])
+  const sounding = useAlarmSound(outNow > 0 && silenced !== outKey, outNow >= 3)
   const total = lastV('ptot')
   const rinfo = RANGES.find(r => r.k === range)!
   const sec = (s: Attr['scope']) => ATTRS.filter(a => a.scope === s).map(a => <Chart key={a.id + range + (s === 'line' ? line : s === 'jar' ? line + jar : '')} a={a} pts={data[a.id] ?? []} range={range} tag={tagOf(a, ctx)} />)
@@ -150,6 +156,9 @@ export default function Dashboard() {
           </div>
           <span className={`dk-live ${paused ? 'p' : ''}`}><i />{paused ? 'Paused' : 'Live'} · {upd.toLocaleTimeString()}</span>
           <button className="ghost" onClick={() => setPaused(p => !p)}>{paused ? 'Resume' : 'Pause'}</button>
+          <SoundToggle />
+          {sounding && <button style={{ background: 'var(--bad)', borderColor: 'var(--bad)', color: '#fff' }} onClick={() => setSilenced(outKey)}>Silence alarm</button>}
+          <GatewayBadge />
           {plc ? <span className="dk-sim" style={{ borderColor: 'var(--ok)', color: 'var(--ok)' }} title="Readings written by the PLC gateway">PLC data</span>
             : <span className="dk-sim" title="No PLC gateway is writing readings yet, so these graphs come from a model of the hatchery.">Simulated data</span>}
           {err && <span className="dk-sim" style={{ borderColor: 'var(--bad)', color: 'var(--bad)' }} title={err}>Read error</span>}

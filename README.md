@@ -77,6 +77,22 @@ node gateway.mjs                                      # reads the PLC
   the browser's time zone. It shows live PLC data as soon as any reading exists, and a simulation before that.
 - Migration: `supabase/migrations/20261113000000_ras_readings_series.sql`.
 
+## Remote access over Wi-Fi
+
+The app is a normal website (GitHub Pages) backed by Supabase, so the dashboard and PLC readings can be read from any phone,
+tablet or computer with internet and a login. Nothing on the plant network is opened to the outside:
+
+```
+PLC --(Ethernet or plant Wi-Fi, Modbus TCP)--> plant computer running gateway/ --(outbound HTTPS)--> Supabase --> your phone
+```
+
+- Put the plant computer on the plant Wi-Fi (or Ethernet) with internet. The gateway only makes outbound connections.
+- The header shows a gateway badge: green when readings arrived in the last 45 s, amber when slow, red when offline. If Wi-Fi
+  drops, the gateway reconnects by itself and carries on (readings missed while it was offline are not back-filled).
+- On a phone, open the site and choose Add to Home Screen to install it. The HMI page switches to a full-width phone layout.
+- Alarm sound plays while an alarm is active (Alarm sound button; browsers need one tap to allow sound). A phone that is
+  locked or has the page in the background will not play it; use a plant-side horn wired to the PLC for unattended alarms.
+
 ## Not yet ported from the dashboard
 
 RAS control simulation (pumps, pipes and PID control) and the manual with all symbols.

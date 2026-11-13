@@ -1,6 +1,7 @@
 // RAS PLC gateway. Reads the PLC over Modbus TCP and writes ras_tag_readings and ras_alarms, using the tag list
 // in ras_plc_tags (address, range, alarm limits). Run `node gateway.mjs --simulate` to test the whole path
 // without a PLC. Needs Node 18+.
+import os from 'node:os'
 import { createClient } from '@supabase/supabase-js'
 
 const env = process.env
@@ -15,11 +16,14 @@ const ZERO_TOL = num('ZERO_TOL', 0.01)
 const sb = createClient(need('SUPABASE_URL'), need('SUPABASE_SERVICE_ROLE_KEY'), { auth: { persistSession: false } })
 const log = (...a) => console.log(new Date().toISOString(), ...a)
 
+let SYSTEM = null
+
 // ---- tag list ---------------------------------------------------------------------------------------------
 async function loadTags() {
   let sid = env.SYSTEM_ID
   if (!sid) { const { data, error } = await sb.from('ras_systems').select('id').limit(1); if (error) throw error; sid = data?.[0]?.id }
   if (!sid) throw new Error('No system found in ras_systems')
+  SYSTEM = sid
   const { data, error } = await sb.from('ras_plc_tags').select('id,tag,io_type,plc_address,unit,range_lo,range_hi,alarm_lo,alarm_hi').eq('system_id', sid).range(0, 4999)
   if (error) throw error
   const tags = []
@@ -135,6 +139,17 @@ async function store(rows) {
   return { raised: raise.length, cleared: clear.length }
 }
 
+// ---- heartbeat: tells the app the gateway is alive, so remote users can see how fresh the data is -----------------
+const state = { plant: { ok: 0, bad: 0 }, jars: { ok: 0, bad: 0 }, connected: SIM, message: null }
+async function heartbeat() {
+  if (!SYSTEM) return
+  const { error } = await sb.from('ras_gateway_status').upsert({
+    system_id: SYSTEM, last_seen: new Date().toISOString(), mode: SIM ? 'simulate' : 'plc', plc_connected: state.connected,
+    tags_ok: state.plant.ok + state.jars.ok, tags_bad: state.plant.bad + state.jars.bad, message: state.message, version: '1.1.0', host: os.hostname(),
+  }, { onConflict: 'system_id' })
+  if (error) log(`heartbeat failed: ${error.message}`)
+}
+
 // ---- main loop ---------------------------------------------------------------------------------------------
 const tags = await loadTags()
 await loadOpenAlarms()
@@ -145,9 +160,12 @@ async function cycle(set, name) {
   busy = true
   try {
     const rows = SIM ? simulate(set) : await readTags(set), r = await store(rows)
+    state[name] = { ok: rows.filter(x => x.state === 'ok').length, bad: rows.filter(x => x.state !== 'ok').length }
+    state.connected = true; state.message = null
     log(`${name}: ${rows.length} readings stored, ${rows.filter(x => x.state !== 'ok').length} not ok, alarms +${r.raised} -${r.cleared}`)
   } catch (e) {
-    log(`${name}: ${e.message ?? e}`); try { modbus?.close(() => {}) } catch { /* reconnect on the next cycle */ } modbus = undefined
+    log(`${name}: ${e.message ?? e}`); state.connected = false; state.message = String(e.message ?? e).slice(0, 200); heartbeat()
+    try { modbus?.close(() => {}) } catch { /* reconnect on the next cycle */ } modbus = undefined
   } finally { busy = false }
 }
 async function rollup() {
@@ -155,7 +173,8 @@ async function rollup() {
   log(error ? `rollup failed: ${error.message}` : `rollup: ${data} tag-hours summarised`)
 }
 log(SIM ? 'Simulation mode: no PLC is read' : `Polling PLC ${env.PLC_HOST} every ${FAST / 1000} s (jars every ${JAR / 1000} s)`)
-await cycle(fast, 'plant'); await cycle(jar, 'jars'); await rollup()
+await cycle(fast, 'plant'); await cycle(jar, 'jars'); await heartbeat(); await rollup()
 setInterval(() => cycle(fast, 'plant'), FAST)
 setInterval(() => cycle(jar, 'jars'), JAR)
+setInterval(heartbeat, 15000)
 setInterval(rollup, 3600000)

@@ -4,6 +4,8 @@ import { useSystem } from '../lib/useSystem'
 import { computeJars, Settings } from '../lib/model'
 import { DEFAULTS, demoJars } from './Simulator'
 import { LIM0, type Lim } from '../lib/standards'
+import { SoundToggle, useAlarmSound } from '../lib/alarmSound'
+import { GatewayBadge } from '../lib/gateway'
 
 // PLC and HMI connection view. Field sensors are wired (4-20 mA) to PLC input modules, the jar sensors reach the PLC
 // over an RS-485 bus, and the PLC talks to the operator HMI over Ethernet. The HMI shows jar KPIs (flow, oxygen,
@@ -95,6 +97,7 @@ const CSS = `
 .gsel{cursor:pointer}.gsel:hover rect.gb{stroke:var(--acc)}
 .fch{display:flex;flex-wrap:wrap;gap:6px}.fch button.on{background:var(--bad);border-color:var(--bad);color:#fff}
 .lim input{width:70px;padding:3px 6px}
+.hmiphone{padding:6px;height:min(780px,calc(100vh - 150px));min-height:640px;display:grid;grid-template-rows:minmax(0,1fr) auto}.hmiphone .hmi{height:100%;min-height:0}
 .hmi{font:12px/1.3 system-ui,sans-serif;color:#d9eeee;background:#0a1819;height:100%;padding:8px;display:grid;grid-template-rows:auto auto auto minmax(0,1fr) auto;gap:6px;border-radius:6px}
 .hmi button{font:700 11px system-ui;border:1px solid #2f5c5c;background:#16393a;color:#d9eeee;border-radius:4px;padding:5px 8px;cursor:pointer}
 .hmi button:disabled{opacity:.4;cursor:default}.hmi .go{background:#1d7a52;border-color:#2fa874}.hmi .no{background:#8a2a1c;border-color:#c8503c}
@@ -260,6 +263,10 @@ export default function PlcHmi() {
   }, [tags, rd, jarK, keys.join(','), cuts])
   const unacked = alarms.filter(a => !acked.includes(a.id)).length
   const horn = unacked > 0
+  const urgent = alarms.some(a => !acked.includes(a.id) && (a.st === 'bad' || a.id.startsWith('PUMP_FAULT') || a.id.startsWith('SUMP_LOW')))
+  const sounding = useAlarmSound(link && horn, urgent)
+  const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches)
+  useEffect(() => { const m = window.matchMedia('(max-width: 900px)'), f = () => setNarrow(m.matches); m.addEventListener('change', f); return () => m.removeEventListener('change', f) }, [])
   const ids = alarms.map(a => a.id).join('|')
   useEffect(() => { const live = new Set(ids.split('|')); setAcked(p => { const n = p.filter(i => live.has(i)); return n.length === p.length ? p : n }) }, [ids])
   rd['HORN'] = { v: horn ? 1 : 0, mA: null, st: 'ok' }
@@ -340,6 +347,69 @@ export default function PlcHmi() {
   const jr = jarK[jl2] ?? [], jbus = rd[`JAR-${lname(jl2)}`]
   const pumpTxt = !link ? '---' : fault ? 'FAULT' : sumpLow ? 'LOW SUMP' : rd['PUMP_RUN']?.v ? 'RUN' : 'STOP'
 
+  const hmiScreen = (
+            <div className="hmi">
+              <div className="hh"><span>RAS HATCHERY · HMI</span>
+                <span>{link && unacked > 0 && <span className="badge">ALARM {unacked}</span>}<span className="led" style={{ background: link ? '#5fcf9b' : '#ff8b78' }} />{link ? 'PLC ONLINE' : 'NO PLC LINK'}</span></div>
+              <div className="hp">
+                <div><small>PUMP</small><b style={{ color: link ? (rd['PUMP_RUN']?.v ? '#5fcf9b' : fault ? '#ff8b78' : '#9db8b5') : '#7fa3a2' }}>{pumpTxt}</b></div>
+                <div><small>Speed</small><b>{link ? f(rd['VFD_SPD']?.v, 0) : '---'}%</b></div>
+                <div><small>Discharge</small><b>{link ? f(rd['PT-100']?.v, 2) : '---'}</b></div>
+                <div><small>Total L/min</small><b>{link ? f(rd['FT-100']?.v, 0) : '---'}</b></div>
+                <div style={{ display: 'grid', gap: 3 }}>
+                  <button className="go" disabled={!link || cmd} onClick={() => setCmd(true)}>START</button>
+                  <button className="no" disabled={!link || !cmd} onClick={() => setCmd(false)}>STOP</button>
+                </div>
+              </div>
+              <div className="nav">
+                {([['ovr', 'OVERVIEW'], ['jar', 'JARS'], ['wq', 'WATER'], ['std', 'LIMITS'], ['alm', `ALARMS${link && alarms.length ? ' ' + alarms.length : ''}`]] as const).map(([k, l]) =>
+                  <button key={k} className={`${page === k ? 'on' : ''} ${k === 'alm' && link && alarms.length ? 'al' : ''}`} onClick={() => setPage(k)}>{l}</button>)}
+              </div>
+              <div className="pg">
+                {!link ? <div className="al"><div className="c"><span>PLC COMMUNICATION LOST · values not updating</span></div></div> : null}
+                {link && page === 'ovr' && <div className="hg">{keys.map(tile)}</div>}
+                {link && page === 'jar' && (
+                  <div>
+                    <div style={{ display: 'flex', gap: 3, marginBottom: 5 }}>
+                      {keys.map(k => <button key={k} className={k === jl2 ? '' : ''} style={{ flex: 1, background: k === jl2 ? '#2a6f70' : undefined, borderColor: jarAlarmCount(k) ? '#e0583f' : undefined }} onClick={() => setJl(k)}>{k.replace('-', '·')}</button>)}
+                    </div>
+                    {jbus?.st === 'bad' && <div className="al"><div className="c"><span>JAR SENSOR BUS FAULT · line {lname(jl2)} jar values unavailable</span></div></div>}
+                    <table className="jt"><thead><tr><th>Jar</th><th>Flow L/min</th><th>O₂ out mg/L</th><th>Press bar</th><th>Temp °C</th></tr><tr><th>Standard</th><th>{limTxt('jflow', '%')}</th><th>{limTxt('jdo')}</th><th>{limTxt('jp')}</th><th>{limTxt('temp')}</th></tr></thead>
+                      <tbody>{jr.map(j => <tr key={j.pos}><td>{j.pos}</td>{jc(j.s.flow, f(j.Q))}{jc(j.s.DO, f(j.DO))}{jc(j.s.P, f(j.P, 2))}{jc(j.s.T, f(j.T))}</tr>)}</tbody></table>
+                    <small style={{ color: '#7fa3a2', display: 'block', marginTop: 4 }}>Oxygen out = inlet oxygen minus egg uptake ÷ jar flow. ▼ below limit, ▲ above.</small>
+                  </div>
+                )}
+                {link && page === 'std' && (
+                  <table className="jt"><thead><tr><th>KPI</th><th>Standard</th><th>Now</th><th>State</th></tr></thead>
+                    <tbody>
+                      {WQ.map(w => { const r = rd[w.tag], st = r?.st ?? 'ok'; return <tr key={w.tag}><td>{w.name}</td><td>{limTxt(w.lim)}</td><td className={st === 'ok' ? '' : st === 'bad' ? 'bad' : 'low'}>{f(r?.v, w.dec)} {w.unit}</td><td className={st === 'ok' ? '' : st === 'bad' ? 'bad' : 'low'}>{st === 'ok' ? 'OK' : st === 'bad' ? 'FAULT' : st.toUpperCase()}</td></tr> })}
+                      {([['jflow', 'Jar flow', 'flow', '% of target'], ['jdo', 'Jar oxygen out', 'DO', ''], ['jp', 'Jar pressure', 'P', ' bar']] as const).map(([k, n, m, u]) => { const c = jarOut(m); return <tr key={k}><td>{n}</td><td>{limTxt(k, u === '% of target' ? '%' : '')}{u && u !== '% of target' ? u : u ? ' of target' : ''}</td><td className={c ? 'low' : ''}>{c ? `${c} jar${c > 1 ? 's' : ''} out` : 'all in range'}</td><td className={c ? 'low' : ''}>{c ? 'ALARM' : 'OK'}</td></tr> })}
+                      {(() => { const r = rd['TT-100'], st = r?.st ?? 'ok'; return <tr><td>Water temperature</td><td>{limTxt('temp', ' °C')}</td><td className={st === 'ok' ? '' : 'low'}>{f(r?.v)} °C</td><td className={st === 'ok' ? '' : 'low'}>{st === 'ok' ? 'OK' : st.toUpperCase()}</td></tr> })()}
+                    </tbody></table>
+                )}
+                {link && page === 'wq' && <div className="hg">{WQ.map(wqTile)}</div>}
+                {link && page === 'alm' && (
+                  <div className="al" style={{ maxHeight: '100%', overflow: 'auto' }}>
+                    {alarms.length === 0 ? <div><span style={{ color: '#5fcf9b' }}>No active alarms</span></div> : alarms.slice(0, 80).map(a => (
+                      <div key={a.id} className={a.st === 'bad' ? 'c' : 'a'} style={{ opacity: acked.includes(a.id) ? 0.55 : 1 }}><span>{a.text}</span><span style={{ whiteSpace: 'nowrap' }}>{a.val}</span></div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div>
+                <div className="al">
+                  {!link ? <div className="c"><span>PLC COMMUNICATION LOST</span></div>
+                    : alarms.length === 0 ? <div><span style={{ color: '#5fcf9b' }}>No active alarms</span></div>
+                    : alarms.slice(0, 2).map(a => <div key={a.id} className={a.st === 'bad' ? 'c' : 'a'} style={{ opacity: acked.includes(a.id) ? 0.55 : 1 }}><span>{a.text}</span><span style={{ whiteSpace: 'nowrap' }}>{a.val}</span></div>)}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 5 }}>
+                  <span><span className="led" style={{ background: link && horn ? '#e0583f' : '#2c4645' }} />HORN {link && alarms.length > 2 ? ` · +${alarms.length - 2} more` : ''}</span>
+                  <button disabled={!link || !alarms.length} onClick={() => setAcked(alarms.map(a => a.id))}>ACK ALL</button>
+                </div>
+              </div>
+            </div>
+  )
+
   return (
     <>
       <style>{CSS}</style>
@@ -353,6 +423,9 @@ export default function PlcHmi() {
           <button className="ghost" onClick={() => setSumpLow(x => !x)}>{sumpLow ? 'Refill sump' : 'Sump low level'}</button>
           <button className="ghost" onClick={() => setLink(x => !x)}>{link ? 'Unplug Ethernet' : 'Plug in Ethernet'}</button>
           <button className="ghost" onClick={() => setCuts([])} disabled={!cuts.length}>Reconnect all sensors</button>
+          <SoundToggle />
+          {sounding && <button className="no" onClick={() => setAcked(alarms.map(a => a.id))}>Silence and acknowledge</button>}
+          <GatewayBadge />
         </div>
         <div>
           <small className="note">Make a KPI fail and watch the HMI alarm:</small>
@@ -362,7 +435,7 @@ export default function PlcHmi() {
           </div>
         </div>
       </div>
-      <div className="panel sc">
+      {narrow ? <div className="panel hmiphone">{hmiScreen}<p className="note">Phone view: the wiring diagram needs a wider screen.</p></div> : <div className="panel sc">
         <svg viewBox={`0 0 1190 ${H}`} style={{ width: '100%', minWidth: 980, display: 'block' }} role="img" aria-label="Sensor to PLC to HMI wiring">
           {tags.map(t => {
             const g = gpos[t.grp], isSel = t.grp === sel2, i = g.rows.indexOf(t)
@@ -430,69 +503,10 @@ export default function PlcHmi() {
           <text x={(PX + PW + 14 + 800) / 2} y={22} fill="var(--mute)" fontSize="11" textAnchor="middle">Ethernet · Modbus TCP</text>
           <rect x={800} y={2} width={386} height={HMI_H} rx={14} fill="#1b2829" stroke="#0e1b1d" strokeWidth={2} />
           <foreignObject x={810} y={12} width={366} height={HMI_H - 20}>
-            <div className="hmi">
-              <div className="hh"><span>RAS HATCHERY · HMI</span>
-                <span>{link && unacked > 0 && <span className="badge">ALARM {unacked}</span>}<span className="led" style={{ background: link ? '#5fcf9b' : '#ff8b78' }} />{link ? 'PLC ONLINE' : 'NO PLC LINK'}</span></div>
-              <div className="hp">
-                <div><small>PUMP</small><b style={{ color: link ? (rd['PUMP_RUN']?.v ? '#5fcf9b' : fault ? '#ff8b78' : '#9db8b5') : '#7fa3a2' }}>{pumpTxt}</b></div>
-                <div><small>Speed</small><b>{link ? f(rd['VFD_SPD']?.v, 0) : '---'}%</b></div>
-                <div><small>Discharge</small><b>{link ? f(rd['PT-100']?.v, 2) : '---'}</b></div>
-                <div><small>Total L/min</small><b>{link ? f(rd['FT-100']?.v, 0) : '---'}</b></div>
-                <div style={{ display: 'grid', gap: 3 }}>
-                  <button className="go" disabled={!link || cmd} onClick={() => setCmd(true)}>START</button>
-                  <button className="no" disabled={!link || !cmd} onClick={() => setCmd(false)}>STOP</button>
-                </div>
-              </div>
-              <div className="nav">
-                {([['ovr', 'OVERVIEW'], ['jar', 'JARS'], ['wq', 'WATER'], ['std', 'LIMITS'], ['alm', `ALARMS${link && alarms.length ? ' ' + alarms.length : ''}`]] as const).map(([k, l]) =>
-                  <button key={k} className={`${page === k ? 'on' : ''} ${k === 'alm' && link && alarms.length ? 'al' : ''}`} onClick={() => setPage(k)}>{l}</button>)}
-              </div>
-              <div className="pg">
-                {!link ? <div className="al"><div className="c"><span>PLC COMMUNICATION LOST · values not updating</span></div></div> : null}
-                {link && page === 'ovr' && <div className="hg">{keys.map(tile)}</div>}
-                {link && page === 'jar' && (
-                  <div>
-                    <div style={{ display: 'flex', gap: 3, marginBottom: 5 }}>
-                      {keys.map(k => <button key={k} className={k === jl2 ? '' : ''} style={{ flex: 1, background: k === jl2 ? '#2a6f70' : undefined, borderColor: jarAlarmCount(k) ? '#e0583f' : undefined }} onClick={() => setJl(k)}>{k.replace('-', '·')}</button>)}
-                    </div>
-                    {jbus?.st === 'bad' && <div className="al"><div className="c"><span>JAR SENSOR BUS FAULT · line {lname(jl2)} jar values unavailable</span></div></div>}
-                    <table className="jt"><thead><tr><th>Jar</th><th>Flow L/min</th><th>O₂ out mg/L</th><th>Press bar</th><th>Temp °C</th></tr><tr><th>Standard</th><th>{limTxt('jflow', '%')}</th><th>{limTxt('jdo')}</th><th>{limTxt('jp')}</th><th>{limTxt('temp')}</th></tr></thead>
-                      <tbody>{jr.map(j => <tr key={j.pos}><td>{j.pos}</td>{jc(j.s.flow, f(j.Q))}{jc(j.s.DO, f(j.DO))}{jc(j.s.P, f(j.P, 2))}{jc(j.s.T, f(j.T))}</tr>)}</tbody></table>
-                    <small style={{ color: '#7fa3a2', display: 'block', marginTop: 4 }}>Oxygen out = inlet oxygen minus egg uptake ÷ jar flow. ▼ below limit, ▲ above.</small>
-                  </div>
-                )}
-                {link && page === 'std' && (
-                  <table className="jt"><thead><tr><th>KPI</th><th>Standard</th><th>Now</th><th>State</th></tr></thead>
-                    <tbody>
-                      {WQ.map(w => { const r = rd[w.tag], st = r?.st ?? 'ok'; return <tr key={w.tag}><td>{w.name}</td><td>{limTxt(w.lim)}</td><td className={st === 'ok' ? '' : st === 'bad' ? 'bad' : 'low'}>{f(r?.v, w.dec)} {w.unit}</td><td className={st === 'ok' ? '' : st === 'bad' ? 'bad' : 'low'}>{st === 'ok' ? 'OK' : st === 'bad' ? 'FAULT' : st.toUpperCase()}</td></tr> })}
-                      {([['jflow', 'Jar flow', 'flow', '% of target'], ['jdo', 'Jar oxygen out', 'DO', ''], ['jp', 'Jar pressure', 'P', ' bar']] as const).map(([k, n, m, u]) => { const c = jarOut(m); return <tr key={k}><td>{n}</td><td>{limTxt(k, u === '% of target' ? '%' : '')}{u && u !== '% of target' ? u : u ? ' of target' : ''}</td><td className={c ? 'low' : ''}>{c ? `${c} jar${c > 1 ? 's' : ''} out` : 'all in range'}</td><td className={c ? 'low' : ''}>{c ? 'ALARM' : 'OK'}</td></tr> })}
-                      {(() => { const r = rd['TT-100'], st = r?.st ?? 'ok'; return <tr><td>Water temperature</td><td>{limTxt('temp', ' °C')}</td><td className={st === 'ok' ? '' : 'low'}>{f(r?.v)} °C</td><td className={st === 'ok' ? '' : 'low'}>{st === 'ok' ? 'OK' : st.toUpperCase()}</td></tr> })()}
-                    </tbody></table>
-                )}
-                {link && page === 'wq' && <div className="hg">{WQ.map(wqTile)}</div>}
-                {link && page === 'alm' && (
-                  <div className="al" style={{ maxHeight: '100%', overflow: 'auto' }}>
-                    {alarms.length === 0 ? <div><span style={{ color: '#5fcf9b' }}>No active alarms</span></div> : alarms.slice(0, 80).map(a => (
-                      <div key={a.id} className={a.st === 'bad' ? 'c' : 'a'} style={{ opacity: acked.includes(a.id) ? 0.55 : 1 }}><span>{a.text}</span><span style={{ whiteSpace: 'nowrap' }}>{a.val}</span></div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div>
-                <div className="al">
-                  {!link ? <div className="c"><span>PLC COMMUNICATION LOST</span></div>
-                    : alarms.length === 0 ? <div><span style={{ color: '#5fcf9b' }}>No active alarms</span></div>
-                    : alarms.slice(0, 2).map(a => <div key={a.id} className={a.st === 'bad' ? 'c' : 'a'} style={{ opacity: acked.includes(a.id) ? 0.55 : 1 }}><span>{a.text}</span><span style={{ whiteSpace: 'nowrap' }}>{a.val}</span></div>)}
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 5 }}>
-                  <span><span className="led" style={{ background: link && horn ? '#e0583f' : '#2c4645' }} />HORN {link && alarms.length > 2 ? ` · +${alarms.length - 2} more` : ''}</span>
-                  <button disabled={!link || !alarms.length} onClick={() => setAcked(alarms.map(a => a.id))}>ACK ALL</button>
-                </div>
-              </div>
-            </div>
+            {hmiScreen}
           </foreignObject>
         </svg>
-      </div>
+      </div>}
       <div className="panel">
         <h2>{gtitle(sel2)} · wiring</h2>
         <div className="sc"><table className="tbl">
