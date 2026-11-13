@@ -1,0 +1,11 @@
+{
+  "name": "RAS System",
+  "short_name": "RAS",
+  "description": "Hatchery RAS dashboard, HMI, SCADA and DCS",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b1819",
+  "theme_color": "#0f5c5c",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

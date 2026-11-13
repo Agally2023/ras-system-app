@@ -1,6 +1,7 @@
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import { useAuth } from './lib/auth'
+import { GatewayBadge } from './lib/gateway'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import DataEntry from './pages/DataEntry'
@@ -16,6 +17,7 @@ export default function App() {
     <div className="wrap">
       <header className="top">
         <h1>RAS System</h1>
+        <GatewayBadge />
         <span className="muted">{session.user.email} ({role})</span>
         <button className="ghost" onClick={() => supabase.auth.signOut()}>Sign out</button>
       </header>

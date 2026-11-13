@@ -44,3 +44,7 @@ details summary{cursor:pointer;font-weight:600}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .seg button{border:0;border-radius:0;background:var(--panel);color:var(--ink);padding:6px 12px}
 .seg button.on{background:var(--acc);color:#fff}
+.gw{font-size:12px;padding:2px 9px;border-radius:999px;border:1px solid var(--line);color:var(--mute);white-space:nowrap}
+.gw.ok{border-color:var(--ok);color:var(--ok)}.gw.warn{border-color:var(--warn);color:var(--warn)}.gw.bad{border-color:var(--bad);color:var(--bad)}
+.tabs{overflow-x:auto;white-space:nowrap}
+@media(max-width:700px){.top{flex-wrap:wrap}.tabs a{padding:10px 12px}}
