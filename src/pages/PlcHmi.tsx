@@ -102,7 +102,7 @@ const CSS = `
 .hmi{font:12px/1.3 system-ui,sans-serif;color:#d9eeee;background:#0a1819;height:100%;padding:8px;display:grid;grid-template-rows:auto auto auto minmax(0,1fr) auto;gap:6px;border-radius:6px}
 .hmi button{font:700 11px system-ui;border:1px solid #2f5c5c;background:#16393a;color:#d9eeee;border-radius:4px;padding:5px 8px;cursor:pointer}
 .hmi button:disabled{opacity:.4;cursor:default}.hmi .go{background:#1d7a52;border-color:#2fa874}.hmi .no{background:#8a2a1c;border-color:#c8503c}
-.hmi .nav{display:flex;gap:4px}.hmi .nav button{flex:1;padding:6px 2px}.hmi .nav button.on{background:#2a6f70;border-color:#6cc6ee}
+.hmi .nav{display:flex;gap:4px}.hmi .nav button{flex:1;padding:6px 1px;font-size:10px}.hmi .nav button.on{background:#2a6f70;border-color:#6cc6ee}
 .hmi .nav button.al{border-color:#e0583f;color:#ff9c88}
 .hh{display:flex;justify-content:space-between;align-items:center;font-weight:700;letter-spacing:.04em}
 .led{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:-1px}
@@ -138,7 +138,7 @@ export default function PlcHmi() {
   const [sel, setSel] = useState('1-A')
   const [fails, setFails] = useState<string[]>([])
   const [ramp, setRamp] = useState<Record<string, number>>({})
-  const [page, setPage] = useState<'ovr' | 'jar' | 'wq' | 'alm'>('ovr')
+  const [page, setPage] = useState<'ovr' | 'jar' | 'wq' | 'std' | 'alm'>('ovr')
   const [jl, setJl] = useState('1-A')
   const [lims, setLims] = useState<Record<string, Lim>>(LIM0)
   const hist = useRef<Record<string, number[]>>({})
@@ -313,9 +313,15 @@ export default function PlcHmi() {
           <span><small>Temp</small>{f(tt?.v)} °C</span><span><small>Press</small>{f(pt?.v, 2)} bar</span>
           <span><small>DO in</small>{f(di?.v)}</span><span><small>DO out</small>{f(dout?.v)}</span>
         </div>
+        <small style={{ marginTop: 3, color: '#5d8584' }}>Limits: temp {limTxt('temp')} · DO out {limTxt('jdo')}</small>
       </div>
     )
   }
+  const limTxt = (k: string, u = '') => {
+    const [lo, hi] = lims[k] ?? []
+    return lo != null && hi != null ? `${lo}–${hi}${u}` : hi != null ? (hi === 0 ? 'none allowed' : `≤ ${hi}${u}`) : lo != null ? `≥ ${lo}${u}` : 'no limit'
+  }
+  const jarOut = (m: string) => alarms.filter(a => a.src === 'jar' && a.id.split('|')[3] === m).length
   const jc = (st: St, txt: string) => <td className={st === 'ok' ? '' : st}>{st === 'off' ? '-' : st === 'bad' ? '---' : txt}{st === 'low' ? ' ▼' : st === 'high' ? ' ▲' : ''}</td>
   const spark = (a: number[], lo: number, hi: number, col: string) => {
     if (a.length < 2) return null
@@ -442,7 +448,7 @@ export default function PlcHmi() {
                 </div>
               </div>
               <div className="nav">
-                {([['ovr', 'OVERVIEW'], ['jar', 'JARS'], ['wq', 'WATER'], ['alm', `ALARMS${link && alarms.length ? ' ' + alarms.length : ''}`]] as const).map(([k, l]) =>
+                {([['ovr', 'OVERVIEW'], ['jar', 'JARS'], ['wq', 'WATER'], ['std', 'LIMITS'], ['alm', `ALARMS${link && alarms.length ? ' ' + alarms.length : ''}`]] as const).map(([k, l]) =>
                   <button key={k} className={`${page === k ? 'on' : ''} ${k === 'alm' && link && alarms.length ? 'al' : ''}`} onClick={() => setPage(k)}>{l}</button>)}
               </div>
               <div className="pg">
@@ -454,10 +460,18 @@ export default function PlcHmi() {
                       {keys.map(k => <button key={k} className={k === jl2 ? '' : ''} style={{ flex: 1, background: k === jl2 ? '#2a6f70' : undefined, borderColor: jarAlarmCount(k) ? '#e0583f' : undefined }} onClick={() => setJl(k)}>{k.replace('-', '·')}</button>)}
                     </div>
                     {jbus?.st === 'bad' && <div className="al"><div className="c"><span>JAR SENSOR BUS FAULT · line {lname(jl2)} jar values unavailable</span></div></div>}
-                    <table className="jt"><thead><tr><th>Jar</th><th>Flow L/min</th><th>O₂ out mg/L</th><th>Press bar</th><th>Temp °C</th></tr></thead>
+                    <table className="jt"><thead><tr><th>Jar</th><th>Flow L/min</th><th>O₂ out mg/L</th><th>Press bar</th><th>Temp °C</th></tr><tr><th>Standard</th><th>{limTxt('jflow', '%')}</th><th>{limTxt('jdo')}</th><th>{limTxt('jp')}</th><th>{limTxt('temp')}</th></tr></thead>
                       <tbody>{jr.map(j => <tr key={j.pos}><td>{j.pos}</td>{jc(j.s.flow, f(j.Q))}{jc(j.s.DO, f(j.DO))}{jc(j.s.P, f(j.P, 2))}{jc(j.s.T, f(j.T))}</tr>)}</tbody></table>
                     <small style={{ color: '#7fa3a2', display: 'block', marginTop: 4 }}>Oxygen out = inlet oxygen minus egg uptake ÷ jar flow. ▼ below limit, ▲ above.</small>
                   </div>
+                )}
+                {link && page === 'std' && (
+                  <table className="jt"><thead><tr><th>KPI</th><th>Standard</th><th>Now</th><th>State</th></tr></thead>
+                    <tbody>
+                      {WQ.map(w => { const r = rd[w.tag], st = r?.st ?? 'ok'; return <tr key={w.tag}><td>{w.name}</td><td>{limTxt(w.lim)}</td><td className={st === 'ok' ? '' : st === 'bad' ? 'bad' : 'low'}>{f(r?.v, w.dec)} {w.unit}</td><td className={st === 'ok' ? '' : st === 'bad' ? 'bad' : 'low'}>{st === 'ok' ? 'OK' : st === 'bad' ? 'FAULT' : st.toUpperCase()}</td></tr> })}
+                      {([['jflow', 'Jar flow', 'flow', '% of target'], ['jdo', 'Jar oxygen out', 'DO', ''], ['jp', 'Jar pressure', 'P', ' bar']] as const).map(([k, n, m, u]) => { const c = jarOut(m); return <tr key={k}><td>{n}</td><td>{limTxt(k, u === '% of target' ? '%' : '')}{u && u !== '% of target' ? u : u ? ' of target' : ''}</td><td className={c ? 'low' : ''}>{c ? `${c} jar${c > 1 ? 's' : ''} out` : 'all in range'}</td><td className={c ? 'low' : ''}>{c ? 'ALARM' : 'OK'}</td></tr> })}
+                      {(() => { const r = rd['TT-100'], st = r?.st ?? 'ok'; return <tr><td>Water temperature</td><td>{limTxt('temp', ' °C')}</td><td className={st === 'ok' ? '' : 'low'}>{f(r?.v)} °C</td><td className={st === 'ok' ? '' : 'low'}>{st === 'ok' ? 'OK' : st.toUpperCase()}</td></tr> })()}
+                    </tbody></table>
                 )}
                 {link && page === 'wq' && <div className="hg">{WQ.map(wqTile)}</div>}
                 {link && page === 'alm' && (
