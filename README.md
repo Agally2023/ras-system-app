@@ -10,7 +10,7 @@ Stack: Vite, React, TypeScript, Supabase (Postgres, Auth, Row Level Security).
 
 | Tab | What it does |
 | --- | --- |
-| Dashboard | Per-line jar table. Valve sliders save to the database, and Auto-set valves finds the openings that give each jar its target flow. Flow, expansion and status come from the model in `src/lib/model.ts` |
+| Dashboard | Live graphs for every attribute on the HMI (water quality, pump, line and jar KPIs) at live, hourly, daily, weekly (ISO weeks), monthly and yearly resolution, with the farm standards drawn on each graph. Data is simulated (`src/lib/series.ts`) until a PLC gateway writes `ras_tag_readings` |
 | Jar simulator | Animated plumbing schematic of 4 jars on one pump and header. Drag a valve slider or type a flow in L/min per jar and watch the egg bed lift, wash out or splash. Live 10 L buckets, auto-tune, surge test. What-if only, nothing is saved |
 | Data entry | Bucket tests (flow = 60 x volume / time) and the jar measurement sheet |
 | PLC I/O | I/O list and active alarms with acknowledge |
@@ -63,4 +63,4 @@ key. Never put the service-role key in this front-end.
 ## Not yet ported from the dashboard
 
 RAS control simulation (pumps, pipes and PID control) and the manual with all symbols.
-Auto-set valves (per line, on the Dashboard) is included.
+Auto-set valves is on the Jar simulator page.
