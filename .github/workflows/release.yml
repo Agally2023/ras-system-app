@@ -36,3 +36,33 @@ jobs:
           gh release view latest >/dev/null 2>&1 || gh release create latest --title "RAS Hatchery Setup (latest)" --notes "Download RAS-Hatchery-Setup.zip, unzip it and run Install-Windows.bat. See README-INSTALL.txt inside."
           gh release upload latest RAS-Hatchery-Setup.zip --clobber
           gh release edit latest --notes "Built from commit ${GITHUB_SHA::7}. Download RAS-Hatchery-Setup.zip, unzip it and run Install-Windows.bat. See README-INSTALL.txt inside."
+
+  windows-app:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://rciyzoosuncncecqmqaq.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY || 'sb_publishable_xPtL1fliQk2k28dWVl4sMQ_GW5poZ-t' }}
+      - name: Build Windows installer
+        shell: bash
+        run: |
+          cp -r dist desktop/app
+          cp -r gateway desktop/gateway
+          cd desktop
+          npm install
+          npx electron-builder --win --publish never
+          ls release
+      - name: Publish to release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view latest >/dev/null 2>&1 || gh release create latest --title "RAS Hatchery (latest)" --notes "Windows installer and package."
+          for f in desktop/release/*.exe; do cp "$f" RAS-Hatchery-Setup.exe; done
+          gh release upload latest RAS-Hatchery-Setup.exe --clobber
