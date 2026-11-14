@@ -27,6 +27,12 @@ const CSS = `
 .sc-tbl{width:100%;border-collapse:collapse;font-size:13px}.sc-tbl th{color:var(--mute);font-weight:500;text-align:left;padding:4px 6px;position:sticky;top:0;background:var(--panel)}
 .sc-tbl td{padding:4px 6px;border-top:1px solid var(--line)}.sc-tbl tr.un td{font-weight:700}.sc-tbl tr.ak td{opacity:.7}
 .sc-scroll{max-height:340px;overflow:auto}
+.sc-tg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.sc-tile{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:2px;min-height:62px}
+.sc-tile b{font-size:19px}.sc-tile small{color:var(--mute);font-weight:400;font-size:11px}
+.sc-jg{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;margin:10px 0 6px}
+.sc-jb{height:38px;padding:0;border:0;border-radius:6px;color:#fff;font-weight:700;font-size:13px}
+@media(max-width:600px){.sc-tbl{font-size:12px}.sc-two{gap:10px}.sc-bar h2{font-size:18px}}
 .sc-tabs{display:flex;gap:4px;margin-bottom:8px}.sc-tabs button{padding:4px 10px}.sc-tabs button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
 `
 
@@ -56,6 +62,8 @@ export default function Scada() {
   const [filter, setFilter] = useState('')
   const [rows, setRows] = useState(40)
   const [prioF, setPrioF] = useState<Prio | 'all'>('all')
+  const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches)
+  useEffect(() => { const m = window.matchMedia('(max-width: 900px)'), f = () => setNarrow(m.matches); m.addEventListener('change', f); return () => m.removeEventListener('change', f) }, [])
 
   const critUn = unacked.some(a => a.prio === 'critical')
   const sounding = useAlarmSound(unacked.length > 0, critUn)
@@ -120,6 +128,39 @@ export default function Scada() {
   const list = alarms.filter(a => prioF === 'all' || a.prio === prioF)
   const t2 = (t: number) => new Date(t).toLocaleTimeString()
 
+
+  // ---- phone layout: the same live data as the mimic, stacked to fit a narrow screen with nothing cut off
+  const Tile = ({ it, label }: { it?: Item; label?: string }) => (
+    <div className={`sc-tile ${it && unKeys.has(it.key) ? 'sc-blink' : ''}`} style={it && it.state !== 'ok' && it.state !== 'nodata' ? { borderColor: col(it), borderWidth: 2 } : undefined} onClick={() => it && pick(it.attr.id, it.ctx.li, it.ctx.pos || 1)}>
+      <small>{label ?? it?.attr.label}</small>
+      <b style={{ color: col(it) }}>{txt(it)} <small>{it?.attr.unit}</small></b>
+      {it && it.lim && <small>{limTxt(it.lim, it.attr.dec)}</small>}
+    </div>
+  )
+  const phoneView = (
+    <div>
+      <div className="panel"><h3 style={{ margin: '0 0 8px' }}>Sump and pumps</h3>
+        <div className="sc-tg"><Tile it={get('stmp')} label="Sump temperature" /><Tile it={get('sdo')} label="Sump oxygen" /><Tile it={get('pdis')} label="Pump pressure" /><Tile it={get('ptot')} label="Supply flow" /><Tile it={get('pspd')} label="Pump speed" />
+          <div className="sc-tile"><small>Pumps</small><b>P-1 {flowing ? 'running' : 'stopped'}</b><small>P-2 standby</small></div></div></div>
+      <div className="panel" style={{ marginTop: 10 }}><h3 style={{ margin: '0 0 8px' }}>Water quality · whole RAS</h3>
+        <div className="sc-tg">{wq.map(id => <Tile key={id} it={get(id)} />)}</div></div>
+      {[0, 1, 2, 3, 4, 5].map(li => (
+        <div key={li} className="panel" style={{ marginTop: 10 }}>
+          <h3 style={{ margin: '0 0 8px' }}>Station {LINES[li].replace('-', ' line ')}</h3>
+          <div className="sc-tg">
+            <Tile it={get('lflow', li)} label="Flow" /><Tile it={get('lprs', li)} label="Pressure" /><Tile it={get('ltmp', li)} label="Temperature" />
+            <Tile it={get('ldin', li)} label="O₂ in" /><Tile it={get('ldout', li)} label="O₂ out" /><Tile it={get('lvalve', li)} label="Valves" /></div>
+          <div className="sc-jg">{Array.from({ length: 18 }, (_, i) => {
+            const pos = i + 1, st = jarState.get(`${li}|${pos}`) ?? 'ok', sl = sel.li === li && sel.pos === pos
+            return <button key={pos} aria-label={`Jar ${pos}`} className="sc-jb" style={{ background: st === 'ok' ? 'var(--ok)' : st === 'nodata' ? 'var(--mute)' : PRIO_COL(st as Prio), outline: sl ? '3px solid var(--ink)' : 'none', opacity: st === 'ok' ? 0.6 : 1 }}
+              onClick={() => { setSel({ li, pos }); setTrend(t => ({ id: ATTRS.find(a => a.id === t.id)?.scope === 'jar' ? t.id : 'jdo', li, pos })) }}>{pos}</button>
+          })}</div>
+          <small className="note">Tap a jar or value to trend it below. Green normal, red or amber out of standard.</small>
+        </div>
+      ))}
+    </div>
+  )
+
   return (
     <div className="dk">
       <style>{CHART_CSS}{CSS}</style>
@@ -143,7 +184,7 @@ export default function Scada() {
         )}
       </div>
 
-      <div className="panel sc" style={{ padding: 6 }}>
+      {narrow ? phoneView : <div className="panel sc" style={{ padding: 6 }}>
         <svg viewBox="0 0 1100 640" style={{ width: '100%', minWidth: 880, display: 'block' }} role="img" aria-label="Plant mimic">
           {/* pipework: supply header, drops to each line, overflow return, treatment, back to sump */}
           {[0, 1, 2].map(s => <path key={s} className="sc-pipe" d={`M330,${72 + s * 160} H690`} />)}
@@ -194,7 +235,7 @@ export default function Scada() {
           <text x={850} y={526} fontSize="11" fill="var(--mute)">out of standard, grey no data.</text>
           <text x={850} y={542} fontSize="11" fill="var(--mute)">Click any value or jar to trend it.</text>
         </svg>
-      </div>
+      </div>}
 
       <div className="sc-two">
         <div className="panel">

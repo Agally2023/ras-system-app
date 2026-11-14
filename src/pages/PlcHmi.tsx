@@ -97,7 +97,7 @@ const CSS = `
 .gsel{cursor:pointer}.gsel:hover rect.gb{stroke:var(--acc)}
 .fch{display:flex;flex-wrap:wrap;gap:6px}.fch button.on{background:var(--bad);border-color:var(--bad);color:#fff}
 .lim input{width:70px;padding:3px 6px}
-.hmiphone{padding:6px;height:min(780px,calc(100vh - 150px));min-height:640px;display:grid;grid-template-rows:minmax(0,1fr) auto}.hmiphone .hmi{height:100%;min-height:0}
+.hmiphone{padding:6px;height:auto;min-height:0;display:block}.hmiphone .hmi{height:auto;display:flex;flex-direction:column;gap:8px}.hmiphone .hmi *{min-height:0}.hmiphone .hmi>*{overflow:visible;flex:none}
 .hmi{font:12px/1.3 system-ui,sans-serif;color:#d9eeee;background:#0a1819;height:100%;padding:8px;display:grid;grid-template-rows:auto auto auto minmax(0,1fr) auto;gap:6px;border-radius:6px}
 .hmi button{font:700 11px system-ui;border:1px solid #2f5c5c;background:#16393a;color:#d9eeee;border-radius:4px;padding:5px 8px;cursor:pointer}
 .hmi button:disabled{opacity:.4;cursor:default}.hmi .go{background:#1d7a52;border-color:#2fa874}.hmi .no{background:#8a2a1c;border-color:#c8503c}
@@ -435,7 +435,9 @@ export default function PlcHmi() {
           </div>
         </div>
       </div>
-      {narrow ? <div className="panel hmiphone">{hmiScreen}<p className="note">Phone view: the wiring diagram needs a wider screen.</p></div> : <div className="panel sc">
+      {narrow && <div className="panel hmiphone">{hmiScreen}</div>}
+      {narrow && <p className="note" style={{ margin: '8px 4px 0' }}>Wiring diagram: swipe sideways to see all of it.</p>}
+      <div className="panel sc" style={narrow ? { overflowX: 'auto', WebkitOverflowScrolling: 'touch' } : undefined}>
         <svg viewBox={`0 0 1190 ${H}`} style={{ width: '100%', minWidth: 980, display: 'block' }} role="img" aria-label="Sensor to PLC to HMI wiring">
           {tags.map(t => {
             const g = gpos[t.grp], isSel = t.grp === sel2, i = g.rows.indexOf(t)
@@ -506,7 +508,7 @@ export default function PlcHmi() {
             {hmiScreen}
           </foreignObject>
         </svg>
-      </div>}
+      </div>
       <div className="panel">
         <h2>{gtitle(sel2)} · wiring</h2>
         <div className="sc"><table className="tbl">
