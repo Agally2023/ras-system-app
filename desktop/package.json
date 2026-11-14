@@ -1,0 +1,21 @@
+{
+  "name": "ras-hatchery",
+  "productName": "RAS Hatchery",
+  "version": "1.0.0",
+  "description": "RAS Hatchery monitor: SCADA, DCS, HMI and dashboard",
+  "author": "RAS Hatchery",
+  "private": true,
+  "main": "main.js",
+  "scripts": { "dist": "electron-builder --win --publish never" },
+  "devDependencies": { "electron": "^33.2.0", "electron-builder": "^25.1.8" },
+  "build": {
+    "appId": "com.rashatchery.monitor",
+    "productName": "RAS Hatchery",
+    "artifactName": "RAS-Hatchery-Setup-${version}.${ext}",
+    "directories": { "output": "release" },
+    "files": ["main.js", "app/**/*"],
+    "extraResources": [{ "from": "gateway", "to": "gateway", "filter": ["**/*", "!node_modules/**", "!.env"] }],
+    "win": { "target": [{ "target": "nsis", "arch": ["x64"] }], "icon": "build/icon.png" },
+    "nsis": { "oneClick": false, "perMachine": false, "allowToChangeInstallationDirectory": true, "createDesktopShortcut": true, "createStartMenuShortcut": true, "shortcutName": "RAS Hatchery" }
+  }
+}
