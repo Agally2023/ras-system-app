@@ -5,6 +5,8 @@ import { supabase } from './supabase'
 type Ctx = { session: Session | null; role: string; loading: boolean }
 const AuthCtx = createContext<Ctx>({ session: null, role: 'viewer', loading: true })
 export const useAuth = () => useContext(AuthCtx)
+export const AUTO = { email: (import.meta.env.VITE_AUTO_LOGIN_EMAIL as string) || '', password: (import.meta.env.VITE_AUTO_LOGIN_PASSWORD as string) || '' }
+export const NO_LOGIN = !!AUTO.email
 export const canEdit = (role: string) => role === 'operator' || role === 'admin'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -13,7 +15,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(async ({ data }) => {
+      // Phone / kiosk builds have no sign-in screen: they sign in by themselves as a read-only monitor account.
+      if (!data.session && AUTO.email) {
+        const r = await supabase.auth.signInWithPassword({ email: AUTO.email, password: AUTO.password })
+        data = { session: r.data.session } as typeof data
+      }
       setSession(data.session)
       setLoading(false)
     })

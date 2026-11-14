@@ -114,3 +114,7 @@ Every push to `main` builds `RAS-Hatchery-Setup.zip` and attaches it to the GitH
 ## Android app
 
 CI builds a signed `RAS-Hatchery.apk` (Capacitor wrapper around the same app) into the `latest` release. On the phone: download it, allow "install unknown apps" for the browser or Files app, open the APK. The signing key lives in the GitHub Actions cache; if it is ever lost, uninstall the old app before installing a new build.
+
+### Android: no sign-in
+
+The APK is built with `VITE_AUTO_LOGIN_EMAIL` / `VITE_AUTO_LOGIN_PASSWORD`, so it opens straight to the app, signed in as the read-only `monitor@rashatchery.app` account (role `viewer`). Data entry and Admin are hidden in that build. The account can read plant data but cannot change anything, and cannot see other users' profiles (`ras_profiles` is own-row only). Because the repo and APK are public, treat that read access as public; to rotate it, change the password in Supabase Auth and in `release.yml`.

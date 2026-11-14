@@ -85,6 +85,8 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://rciyzoosuncncecqmqaq.supabase.co' }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY || 'sb_publishable_xPtL1fliQk2k28dWVl4sMQ_GW5poZ-t' }}
+          VITE_AUTO_LOGIN_EMAIL: monitor@rashatchery.app
+          VITE_AUTO_LOGIN_PASSWORD: Ras-Monitor-7QxW4nBv2LpD
       - name: Signing key (kept in the Actions cache so updates install over older versions)
         uses: actions/cache@v4
         with:
