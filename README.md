@@ -110,3 +110,7 @@ The **PLC plan** tab (`#/plan`) shows where the automation equipment sits (site 
 ## Installable package
 
 Every push to `main` builds `RAS-Hatchery-Setup.zip` and attaches it to the GitHub release named `latest` (Releases page). Unzip it on the monitor computer and run `Install-Windows.bat`; see `installer/README-INSTALL.txt`.
+
+## Android app
+
+CI builds a signed `RAS-Hatchery.apk` (Capacitor wrapper around the same app) into the `latest` release. On the phone: download it, allow "install unknown apps" for the browser or Files app, open the APK. The signing key lives in the GitHub Actions cache; if it is ever lost, uninstall the old app before installing a new build.

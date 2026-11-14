@@ -1,0 +1,7 @@
+{
+  "appId": "com.rashatchery.monitor",
+  "appName": "RAS Hatchery",
+  "webDir": "www",
+  "backgroundColor": "#f2f5f4",
+  "server": { "androidScheme": "https" }
+}
