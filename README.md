@@ -97,3 +97,8 @@ PLC --(Ethernet or plant Wi-Fi, Modbus TCP)--> plant computer running gateway/ -
 
 RAS control simulation (pumps, pipes and PID control) and the manual with all symbols.
 Auto-set valves is on the Jar simulator page.
+
+## SCADA and DCS views
+
+- **SCADA** (`#/scada`): plant-wide supervision. Live mimic of the sump, pumps, three stations with all 108 jars, drum filter, biofilter and water-quality analysers; alarm summary with acknowledge and a journal; trends for any tag; tag browser. Uses PLC readings once the gateway writes them, otherwise a simulation.
+- **DCS** (`#/dcs`): control view with PID faceplates for the pump-speed, aeration and temperature loops (settings from `ras_control_loops`), AUTO/MAN, setpoint entry (Save writes the loop and logs to `ras_control_events`), interlocks and deviation alarms with siren. The process behind the loops is simulated until a PLC runs them.
