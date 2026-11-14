@@ -3,6 +3,8 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * 1'   # weekly, keeps the Android signing key cache alive
 
 permissions:
   contents: write
@@ -66,3 +68,55 @@ jobs:
           gh release view latest >/dev/null 2>&1 || gh release create latest --title "RAS Hatchery (latest)" --notes "Windows installer and package."
           for f in desktop/release/*.exe; do cp "$f" RAS-Hatchery-Setup.exe; done
           gh release upload latest RAS-Hatchery-Setup.exe --clobber
+
+  android-app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: npm install
+      - run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://rciyzoosuncncecqmqaq.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY || 'sb_publishable_xPtL1fliQk2k28dWVl4sMQ_GW5poZ-t' }}
+      - name: Signing key (kept in the Actions cache so updates install over older versions)
+        uses: actions/cache@v4
+        with:
+          path: ~/ras-signing
+          key: ras-android-signing-v1
+      - name: Create signing key if missing
+        run: |
+          if [ ! -f ~/ras-signing/ras.jks ]; then
+            mkdir -p ~/ras-signing
+            keytool -genkeypair -keystore ~/ras-signing/ras.jks -storepass rashatchery -keypass rashatchery -alias ras -keyalg RSA -keysize 2048 -validity 12000 -dname "CN=RAS Hatchery"
+          fi
+      - name: Build Android project
+        working-directory: mobile
+        run: |
+          npm install
+          mkdir www && cp -r ../dist/* www/
+          npx cap add android
+          npx capacitor-assets generate --android || echo "icon generation skipped"
+          npx cap sync android
+          sed -i "s/versionCode 1/versionCode ${{ github.run_number }}/; s/versionName \"1.0\"/versionName \"1.0.${{ github.run_number }}\"/" android/app/build.gradle
+          cd android && chmod +x gradlew && ./gradlew assembleRelease --no-daemon
+      - name: Align and sign APK
+        run: |
+          BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
+          UNSIGNED=$(find mobile/android/app/build/outputs/apk/release -name "*.apk" | head -1)
+          $BT/zipalign -p -f 4 "$UNSIGNED" aligned.apk
+          $BT/apksigner sign --ks ~/ras-signing/ras.jks --ks-pass pass:rashatchery --key-pass pass:rashatchery --out RAS-Hatchery.apk aligned.apk
+          $BT/apksigner verify RAS-Hatchery.apk
+          ls -l RAS-Hatchery.apk
+      - name: Publish to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view latest >/dev/null 2>&1 || gh release create latest --title "RAS Hatchery (latest)" --notes "Installers."
+          gh release upload latest RAS-Hatchery.apk --clobber
