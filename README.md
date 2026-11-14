@@ -106,3 +106,7 @@ Auto-set valves is on the Jar simulator page.
 ## PLC plan
 
 The **PLC plan** tab (`#/plan`) shows where the automation equipment sits (site plan), how it is laid out inside the control panel, and how signals are wired (4-20 mA, PNP/NPN inputs, direct-on-line pump starter). It is a planning drawing; have an electrician confirm ratings and cable sizes.
+
+## Installable package
+
+Every push to `main` builds `RAS-Hatchery-Setup.zip` and attaches it to the GitHub release named `latest` (Releases page). Unzip it on the monitor computer and run `Install-Windows.bat`; see `installer/README-INSTALL.txt`.
