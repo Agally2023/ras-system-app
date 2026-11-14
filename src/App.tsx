@@ -10,6 +10,7 @@ import Admin from './pages/Admin'
 import Simulator from './pages/Simulator'
 import Scada from './pages/Scada'
 import Dcs from './pages/Dcs'
+import Plan from './pages/Plan'
 
 export default function App() {
   const { session, role, loading } = useAuth()
@@ -30,6 +31,7 @@ export default function App() {
         <NavLink to="/plc">PLC I/O</NavLink>
         <NavLink to="/scada">SCADA</NavLink>
         <NavLink to="/dcs">DCS</NavLink>
+        <NavLink to="/plan">PLC plan</NavLink>
         <NavLink to="/admin">Admin</NavLink>
       </nav>
       <Routes>
@@ -39,6 +41,7 @@ export default function App() {
         <Route path="/plc" element={<Plc />} />
         <Route path="/scada" element={<Scada />} />
         <Route path="/dcs" element={<Dcs />} />
+        <Route path="/plan" element={<Plan />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
