@@ -102,3 +102,7 @@ Auto-set valves is on the Jar simulator page.
 
 - **SCADA** (`#/scada`): plant-wide supervision. Live mimic of the sump, pumps, three stations with all 108 jars, drum filter, biofilter and water-quality analysers; alarm summary with acknowledge and a journal; trends for any tag; tag browser. Uses PLC readings once the gateway writes them, otherwise a simulation.
 - **DCS** (`#/dcs`): control view with PID faceplates for the pump-speed, aeration and temperature loops (settings from `ras_control_loops`), AUTO/MAN, setpoint entry (Save writes the loop and logs to `ras_control_events`), interlocks and deviation alarms with siren. The process behind the loops is simulated until a PLC runs them.
+
+## PLC plan
+
+The **PLC plan** tab (`#/plan`) shows where the automation equipment sits (site plan), how it is laid out inside the control panel, and how signals are wired (4-20 mA, PNP/NPN inputs, direct-on-line pump starter). It is a planning drawing; have an electrician confirm ratings and cable sizes.
